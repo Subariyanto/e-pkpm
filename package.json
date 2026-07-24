@@ -1,0 +1,45 @@
+{
+  "name": "e-pkpm",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "e2e": "playwright test",
+    "e2e:report": "playwright show-report"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "latest",
+    "@supabase/supabase-js": "latest",
+    "dexie": "latest",
+    "dexie-react-hooks": "latest",
+    "html2canvas": "latest",
+    "jspdf": "latest",
+    "lucide-react": "latest",
+    "qrcode": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-hook-form": "latest",
+    "react-router-dom": "latest",
+    "recharts": "latest",
+    "xlsx": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@types/qrcode": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "autoprefixer": "latest",
+    "postcss": "latest",
+    "tailwindcss": "3.4.17",
+    "typescript": "latest",
+    "vite": "latest",
+    "vite-plugin-pwa": "latest",
+    "vitest": "latest"
+  }
+}
