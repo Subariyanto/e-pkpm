@@ -20,8 +20,8 @@ import { nilaiKomponen } from './IndicatorList';
 import type { Assessment, Indicator } from '../../types';
 import { Printer } from 'lucide-react';
 
-type Profil = { nama?: string; nip?: string; jabatan?: string; unit?: string };
-type Org = { name?: string; district?: string; chairman?: string; period?: string; address?: string };
+type Profil = { nama?: string; nip?: string; jabatan?: string; unit?: string; kabupaten?: string; kop?: string[] };
+type Org = { name?: string; district?: string; chairman?: string; period?: string; address?: string; phone?: string; email?: string };
 
 /** Ringkasan Catatan Hasil Penilaian dari skor seluruh indikator. */
 function catatanHasil(rows: { ind: Indicator; a?: Partial<Assessment> }[]) {
@@ -133,6 +133,21 @@ export function CetakInstrumenPage() {
   const rtl = useMemo(() => rekapRTL(baris), [baris]);
   const profil = (profilSetting?.value || {}) as Profil;
   const org = (orgSetting || {}) as Org;
+  const kabupaten = (profil.kabupaten || '').trim();
+  const kotaTtd = kabupaten || org.district || 'Jember';
+
+  /**
+   * Kop surat empat baris yang dipakai pada lembar cetak.
+   * Diambil dari isian menu Profil Penilai & Sasaran; baris yang dikosongkan
+   * memakai teks bawaan supaya dokumen tetap utuh.
+   */
+  const kopBawaan = [
+    'KEMENTERIAN AGAMA REPUBLIK INDONESIA',
+    `KANTOR KEMENTERIAN AGAMA${kabupaten ? ` KABUPATEN ${kabupaten.toUpperCase()}` : ''}`,
+    org.address || '',
+    [org.phone ? `Telepon ${org.phone}` : '', org.email || ''].filter(Boolean).join(' · '),
+  ];
+  const kop = [0, 1, 2, 3].map(i => (profil.kop?.[i] || '').trim() || kopBawaan[i]).filter(Boolean);
 
   const tanggalCetak = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -184,11 +199,20 @@ export function CetakInstrumenPage() {
       {/* ===== Lembar cetak ===== */}
       {pid && (
         <div id="cetak-instrumen" className="print-area bg-white text-slate-900 mt-6 print:mt-0">
-          {/* Kop */}
+          {/* Kop — empat baris dari menu Profil Penilai & Sasaran */}
           <div className="text-center border-b-4 border-double border-slate-800 pb-3 mb-4">
-            <p className="text-sm font-semibold uppercase tracking-wide">Kementerian Agama Republik Indonesia</p>
-            <p className="text-lg font-bold uppercase">{org.name || 'Pokjawas Madrasah Kabupaten'}</p>
-            {org.address && <p className="text-[11px] text-slate-600">{org.address}</p>}
+            {kop.map((baris, i) => (
+              <p
+                key={i}
+                className={
+                  i === 0 ? 'text-sm font-semibold uppercase tracking-wide'
+                    : i === 1 ? 'text-lg font-bold uppercase'
+                      : 'text-[11px] text-slate-600'
+                }
+              >
+                {baris}
+              </p>
+            ))}
           </div>
 
           <h1 className="text-center font-bold text-base uppercase">Instrumen Penilaian Kinerja Pengawas Madrasah</h1>
@@ -353,6 +377,7 @@ export function CetakInstrumenPage() {
 
           {/* F. Tanda tangan sejajar */}
           <div className="avoid-break">
+            <p className="text-right text-xs mb-1">{kotaTtd}, {tanggalCetak}</p>
             <table className="w-full text-xs">
               <tbody>
                 <tr>
@@ -371,9 +396,6 @@ export function CetakInstrumenPage() {
                 </tr>
               </tbody>
             </table>
-            <p className="text-right text-[10px] text-slate-500 mt-2">
-              {org.district || 'Jember'}, {tanggalCetak}
-            </p>
           </div>
         </div>
       )}

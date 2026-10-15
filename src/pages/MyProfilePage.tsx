@@ -51,13 +51,21 @@ export function MyProfilePage() {
   const [nip, setNip] = useState('');
   const [jabatan, setJabatan] = useState('');
   const [unit, setUnit] = useState('');
+  const [kabupaten, setKabupaten] = useState('');
+  const [kop1, setKop1] = useState('');
+  const [kop2, setKop2] = useState('');
+  const [kop3, setKop3] = useState('');
+  const [kop4, setKop4] = useState('');
   const [info, setInfo] = useState('');
   const [form, setForm] = useState<SasaranForm | null>(null);
   const [formId, setFormId] = useState<string | null>(null); // null = mode tambah
   const [formErr, setFormErr] = useState('');
 
   const profil = useLiveQuery(() => db.settings.get('profilPenilai'), []);
-  const p = profil?.value as { nama?: string; nip?: string; jabatan?: string; unit?: string } | undefined;
+  const p = profil?.value as {
+    nama?: string; nip?: string; jabatan?: string; unit?: string;
+    kabupaten?: string; kop?: string[];
+  } | undefined;
 
   const ps = useLiveQuery(() => db.supervisors.toArray(), []) || [];
   const aku = useMemo(() => ps.find(x => x.nip === p?.nip), [ps, p?.nip]);
@@ -67,6 +75,14 @@ export function MyProfilePage() {
     const pin = (nip || p?.nip || '').trim();
     const j = (jabatan || p?.jabatan || '').trim();
     const u = (unit || p?.unit || '').trim();
+    const kab = (kabupaten || p?.kabupaten || '').trim();
+    const kopLama = p?.kop || [];
+    const kopBaru = [
+      (kop1 || kopLama[0] || '').trim(),
+      (kop2 || kopLama[1] || '').trim(),
+      (kop3 || kopLama[2] || '').trim(),
+      (kop4 || kopLama[3] || '').trim(),
+    ];
     if (!n) return setInfo('Nama penilai wajib diisi.');
     if (pin && !/^\d{18}$/.test(pin)) return setInfo('NIP wajib 18 digit angka (boleh dikosongkan).');
     if (pin) {
@@ -75,10 +91,14 @@ export function MyProfilePage() {
         return setInfo(`NIP ${pin} sudah dipakai pengawas "${bentrok.name}". Periksa kembali.`);
       }
     }
-    await db.settings.put({ key: 'profilPenilai', value: { nama: n, nip: pin, jabatan: j, unit: u } });
-    await audit('PROFIL_PENILAI', n, { nip: pin });
+    await db.settings.put({
+      key: 'profilPenilai',
+      value: { nama: n, nip: pin, jabatan: j, unit: u, kabupaten: kab, kop: kopBaru },
+    });
+    await audit('PROFIL_PENILAI', n, { nip: pin, kabupaten: kab });
     setNama(''); setNip(''); setJabatan(''); setUnit('');
-    setInfo('Profil penilai tersimpan di perangkat ini.');
+    setKabupaten(''); setKop1(''); setKop2(''); setKop3(''); setKop4('');
+    setInfo('Profil penilai dan kop surat tersimpan di perangkat ini.');
   }
 
   /** Buka form tambah sasaran (kosong). */
@@ -218,6 +238,10 @@ export function MyProfilePage() {
             <div><span className="text-slate-500">NIP</span><p className="font-semibold">{p.nip || '-'}</p></div>
             <div><span className="text-slate-500">Jabatan</span><p className="font-semibold">{p.jabatan || '-'}</p></div>
             <div><span className="text-slate-500">Unit Kerja</span><p className="font-semibold">{p.unit || '-'}</p></div>
+            <div><span className="text-slate-500">Kabupaten</span><p className="font-semibold">{p.kabupaten || '-'}</p></div>
+            <div className="md:col-span-3"><span className="text-slate-500">Kop Surat</span>
+              <p className="font-semibold whitespace-pre-line">{(p.kop || []).filter(Boolean).join('\n') || '-'}</p>
+            </div>
           </div>
         ) : (
           <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
@@ -225,18 +249,48 @@ export function MyProfilePage() {
           </p>
         )}
         <div className="grid md:grid-cols-4 gap-3">
-          <label className="text-sm">Nama penilai
+          <label className="text-sm md:col-span-2">Nama penilai
             <input className="input mt-1" value={nama} onChange={e => setNama(e.target.value)} placeholder={p?.nama || 'Nama lengkap'} />
           </label>
           <label className="text-sm">NIP
             <input className="input mt-1" value={nip} onChange={e => setNip(e.target.value)} placeholder={p?.nip || '18 digit'} />
           </label>
-          <label className="text-sm">Jabatan
+          <label className="text-sm">Kabupaten
+            <input className="input mt-1" value={kabupaten} onChange={e => setKabupaten(e.target.value)}
+              placeholder={p?.kabupaten || 'Contoh: Jember'} />
+          </label>
+          <label className="text-sm md:col-span-2">Jabatan
             <input className="input mt-1" value={jabatan} onChange={e => setJabatan(e.target.value)} placeholder={p?.jabatan || 'Pengawas Madya'} />
           </label>
-          <label className="text-sm">Unit kerja
+          <label className="text-sm md:col-span-2">Unit kerja
             <input className="input mt-1" value={unit} onChange={e => setUnit(e.target.value)} placeholder={p?.unit || 'Pokjawas Jember'} />
           </label>
+        </div>
+
+        {/* Kop surat untuk dokumen cetak (Cetak Instrumen) */}
+        <div className="mt-5 pt-4 border-t border-slate-200">
+          <h4 className="font-bold text-sm text-[#173f70] mb-1">Kop Surat Kementerian Agama</h4>
+          <p className="text-xs text-slate-500 mb-3">
+            Empat baris kop yang dipakai pada dokumen <b>Cetak Instrumen</b>. Kosongkan bila ingin memakai teks bawaan.
+          </p>
+          <div className="grid md:grid-cols-2 gap-3">
+            <label className="text-sm md:col-span-2">Baris 1
+              <input className="input mt-1" value={kop1} onChange={e => setKop1(e.target.value)}
+                placeholder={p?.kop?.[0] || 'KEMENTERIAN AGAMA REPUBLIK INDONESIA'} />
+            </label>
+            <label className="text-sm md:col-span-2">Baris 2
+              <input className="input mt-1" value={kop2} onChange={e => setKop2(e.target.value)}
+                placeholder={p?.kop?.[1] || 'KANTOR KEMENTERIAN AGAMA KABUPATEN JEMBER'} />
+            </label>
+            <label className="text-sm md:col-span-2">Baris 3
+              <input className="input mt-1" value={kop3} onChange={e => setKop3(e.target.value)}
+                placeholder={p?.kop?.[2] || 'Jalan ... Nomor ... Telepon ...'} />
+            </label>
+            <label className="text-sm md:col-span-2">Baris 4
+              <input className="input mt-1" value={kop4} onChange={e => setKop4(e.target.value)}
+                placeholder={p?.kop?.[3] || 'Website ... / Email ...'} />
+            </label>
+          </div>
         </div>
         <div className="mt-4">
           <Button onClick={simpanProfil}>{p?.nama ? 'Perbarui Profil' : 'Simpan Profil'}</Button>
