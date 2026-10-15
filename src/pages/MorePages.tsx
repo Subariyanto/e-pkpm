@@ -19,12 +19,13 @@ export function Recap(){
    const master=instrumenAktif(ins);
    const org=await db.org.toCollection().first();
    const regulasi=await db.regulasi.toArray();
-   return {supervisor,items,master,result:r,regulasi,org};
+   const penilai=us.find(x=>x.id===r.assessorId)?.name;
+   return {supervisor,items,master,result:r,regulasi,org,penilai};
   }
  /** Buka pratinjau cetak satu pengawas pada tab baru (dialog cetak bawaan browser). */
   async function cetakSatu(r:Result){
    setCetak(`Menyiapkan pratinjau ${ps.find(x=>x.id===r.supervisorId)?.name||''}…`);
-   try{const b=await bahanCetak(r);const blob=await generateIndividualPdf(b.supervisor,b.items,b.master,b.result,b.regulasi,b.org||{name:'Pokjawas Jember',chairman:'',headOffice:''});const ok=openPdfTab(blob);setCetak(ok?'Pratinjau terbuka di tab baru. Gunakan dialog cetak browser untuk mengeprint atau menyimpan PDF.':'Pratinjau diblokir browser. Izinkan pop-up untuk pkpm.pokjawasjember.com lalu coba lagi.')}
+   try{const b=await bahanCetak(r);const blob=await generateIndividualPdf(b.supervisor,b.items,b.master,b.result,b.regulasi,b.org||{name:'Pokjawas Jember',chairman:'',headOffice:''},b.penilai);const ok=openPdfTab(blob);setCetak(ok?'Pratinjau terbuka di tab baru. Gunakan dialog cetak browser untuk mengeprint atau menyimpan PDF.':'Pratinjau diblokir browser. Izinkan pop-up untuk pkpm.pokjawasjember.com lalu coba lagi.')}
    catch(x:any){setCetak(x?.message||String(x))}
   }
  /** Pratinjau cetak semua pengawas dalam satu PDF gabungan (satu pengawas satu halaman). */
@@ -37,9 +38,9 @@ export function Recap(){
      setCetak(`Menyiapkan ${n+1}/${daftar.length}…`);
      kumpulan.push(await bahanCetak(r));
     }
-    const blob=await generateBatchPdf(kumpulan,await db.org.toCollection().first()||{name:'Pokjawas Jember',chairman:'',headOffice:''});
+    const blob=await generateBatchPdf(kumpulan,await db.org.toCollection().first()||{name:'Pokjawas Jember',chairman:'',headOffice:''},us);
     const ok=openPdfTab(blob);
-    setCetak(ok?`Pratinjau ${daftar.length} laporan terbuka dalam satu berkas PDF.`:'Pratinjau diblokir browser. Izinkan pop-up untuk pkpm.pokjawasjember.com lalu coba lagi.');
+    setCetak(ok?`Pratinjau ${daftar.length} laporan terbuka dalam satu berkas PDF (satu pengawas satu halaman).`:'Pratinjau diblokir browser. Izinkan pop-up untuk pkpm.pokjawasjember.com lalu coba lagi.');
    }catch(x:any){setCetak(x?.message||String(x))}
   }
  const rows=rs.map((r,i)=>{const p=ps.find(x=>x.id===r.supervisorId),u=us.find(x=>x.id===r.assessorId);const scores=asms.filter(a=>a.supervisorId===r.supervisorId&&!a.na).map(a=>({id:a.indicatorId,score:a.score??0}));const low=scores.sort((a,b)=>a.score-b.score)[0];return [i+1,p?.name,p?.nip,u?.name,...['K1','K2','K3','K4'].map(k=>(r.componentScores[k]||0).toFixed(2)),r.finalScore.toFixed(2),r.predicate,ins.find(x=>x.id===low?.id)?.code||'-',r.status,<div className="flex gap-2"><Button size="sm" variant="light" onClick={()=>cetakSatu(r)}>Cetak</Button></div>]});async function excel(){const XLSX=await import('xlsx');const ws=XLSX.utils.aoa_to_sheet([['No','Nama','NIP','Penilai','K1','K2','K3','K4','Akhir','Predikat','Indikator Terendah','Status'],...rows]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Rekap');XLSX.writeFile(wb,'Rekap-PKPM.xlsx')}const pkbData=ins.filter(i=>i.versiInstrumen==='pkpm-0-2-v2').map(i=>{const vals=asms.filter(a=>a.indicatorId===i.id&&!a.na).map(a=>a.score??0);return {i,vals,avg:vals.length?(vals.reduce((a,b)=>a+b,0)/vals.length):0}}).filter(x=>x.vals.length).sort((a,b)=>a.avg-b.avg).slice(0,10);return <><PageTitle title="Rekap Hasil & Prioritas PKB" desc="Nilai Kabupaten dan indikator terendah" action={<div className="flex flex-wrap gap-2"><Button onClick={excel}>Ekspor Excel</Button><Button variant="light" onClick={()=>cetakSemua(true)} disabled={!!cetak}>Cetak Semua Pengawas</Button></div>}/>{cetak&&<Card className="mb-4"><p className="text-sm text-[#173f70]">{cetak}</p></Card>}<Card><Table heads={['No','Pengawas','NIP','Penilai','K1','K2','K3','K4','Akhir','Predikat','Terendah','Status','Cetak']} rows={rows}/></Card><PageTitle title="Sepuluh Prioritas PKB Kabupaten" desc="Agregasi indikator dengan skor terendah"/><div className="grid md:grid-cols-2 gap-3">{pkbData.map((x,n)=><Card key={x.i.id}><b>{n+1}. {x.i.code} · {x.i.title||x.i.description}</b><p className="text-sm">Rata-rata skor: {x.avg.toFixed(2)} · Rendah: {x.vals.filter(v=>v<=1).length} pengawas · Bobot: {x.i.weight}</p><p className="text-xs text-slate-500">Rekomendasi: {x.i.pkb}</p></Card>)}</div></>}

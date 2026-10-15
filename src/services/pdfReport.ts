@@ -1,28 +1,77 @@
 import jsPDF from 'jspdf';
-import type { Assessment, Indicator, Result, Supervisor, Regulasi, PredikatRow } from '../types';
+import type { Assessment, Indicator, Result, Supervisor, Regulasi, PredikatRow, Org } from '../types';
 import { calculate, computePriorities, indicatorsForJenjang } from '../services/core';
 import { BOBOT_DEFAULT, PREDIKAT_DEFAULT } from '../data/demo';
 
-function autoTable(doc: jsPDF, rows: any[], y: number, margin: number, pageW: number) {
-  const colW = [10, pageW - margin * 2 - 10 - 20 - 20, 20, 20, 20];
-  const lineH = 6;
-  doc.setFontSize(8);
-  for (const row of rows) {
-    if (y > 260) { doc.addPage(); y = 25; }
-    doc.setFont('helvetica', 'bold');
-    doc.text(String(row[0]), margin, y);
-    doc.setFont('helvetica', 'normal');
-    const text = doc.splitTextToSize(row[1], colW[1]);
-    doc.text(text, margin + colW[0], y);
-    for (let i = 1; i <= 3; i++) {
-      const score = row[1 + i];
-      if (score === '✓') doc.setFont('helvetica', 'bold');
-      doc.text(String(score), margin + colW[0] + colW[1] + 20 * (i - 1), y);
-      doc.setFont('helvetica', 'normal');
-    }
-    y += Math.max(lineH * 3, text.length * lineH);
-  }
-  return y;
+/** Data organisasi yang dipakai pada kop dan tanda tangan laporan. */
+type OrgLike = Partial<Org> & { name: string; chairman?: string; headOffice?: string };
+
+/** Bersihkan teks dari karakter non-Latin (emoji) yang merusak rendering PDF. */
+function bersih(v: unknown): string {
+  return String(v ?? '').replace(/[^\x20-\x7E\xA0-\xFF]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+/** Format tanggal Indonesia, mis. 16 Oktober 2026. */
+function tanggalIndo(iso?: string) {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return bersih(iso);
+  return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+/**
+ * Kop surat resmi empat baris: Kementerian, Kantor Kemenag Kabupaten,
+ * alamat, serta telepon dan surel. Baris kosong memakai teks bawaan.
+ */
+function kopSurat(doc: jsPDF, org: OrgLike): number {
+  const kab = bersih(org.district).replace(/^kabupaten\s+/i, '') || 'Jember';
+  const alamat = bersih(org.address) || `Jl. Bengawan Solo No. 1, Kabupaten ${kab}`;
+  const kontak = [bersih(org.phone), bersih(org.email)].filter(Boolean).join(' / ') || 'Telepon (0331) 000000 / pokjawas@kemenag.go.id';
+  let y = 15;
+  doc.setTextColor(0, 0, 0);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text('KEMENTERIAN AGAMA REPUBLIK INDONESIA', 105, y, { align: 'center' }); y += 5;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text(`KANTOR KEMENTERIAN AGAMA KABUPATEN ${kab.toUpperCase()}`, 105, y, { align: 'center' }); y += 5;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(alamat, 105, y, { align: 'center' }); y += 4;
+  doc.text(kontak, 105, y, { align: 'center' }); y += 4;
+  doc.setLineWidth(0.8);
+  doc.line(15, y, 195, y);
+  doc.setLineWidth(0.2);
+  doc.line(15, y + 1.1, 195, y + 1.1);
+  return y + 7;
+}
+
+/**
+ * Judul setiap komponen penilaian beserta bobotnya.
+ */
+const KOMPONEN_INFO: Record<string, { urut: string; judul: string; bobot: number }> = {
+  K1: { urut: 'A.', judul: 'Penyusunan Program', bobot: 10 },
+  K2: { urut: 'B.', judul: 'Pelaksanaan Program', bobot: 50 },
+  K3: { urut: 'C.', judul: 'Evaluasi Hasil', bobot: 10 },
+  K4: { urut: 'D.', judul: 'Pembimbingan dan Pelatihan', bobot: 30 },
+};
+
+/** Blok tanda tangan: pihak kanan (Kepala Kantor) dan pihak kiri (Ketua Pokjawas). */
+function tandaTangan(doc: jsPDF, org: OrgLike, kota: string) {
+  const y0 = 232;
+  const kiri = 15, kanan = 120;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(`${kota}, ${tanggalIndo(new Date().toISOString())}`, kanan, y0);
+  doc.text('Mengetahui,', kiri, y0);
+  doc.text('Kepala Kantor,', kanan, y0 + 5);
+  doc.text('Ketua Pokjawas,', kiri, y0 + 5);
+  doc.setFont('helvetica', 'bold');
+  doc.text(bersih(org.headOffice) || '_________________________', kanan, y0 + 32);
+  doc.text(bersih(org.chairman) || '_________________________', kiri, y0 + 32);
+  doc.setFont('helvetica', 'normal');
+  doc.text('NIP. ................................', kanan, y0 + 37);
+  doc.text('NIP. ................................', kiri, y0 + 37);
 }
 
 function renderIndividual(
@@ -32,31 +81,41 @@ function renderIndividual(
   master: Indicator[],
   result: Result,
   regulasi: Regulasi[],
-  org: { name: string; chairman: string; headOffice: string },
+  org: OrgLike,
+  penilai?: string,
 ) {
   const margin = 15;
   const pageW = 210;
   const innerW = pageW - margin * 2;
-  let y = 25;
   const bobot = BOBOT_DEFAULT;
-  const preds = PREDIKAT_DEFAULT as PredikatRow[];
-  const calc = calculate(items, master, preds, bobot);
+  const calc = calculate(items, master, undefined, bobot);
   const priorities = computePriorities(items, master, bobot);
-  const jenjang = supervisor.level || 'Madya';
+  const jenjang = bersih(supervisor.level) || 'Madya';
   const ins = indicatorsForJenjang(master, jenjang);
 
-  // Header
+  // Kop surat resmi
+  let y = kopSurat(doc, org as OrgLike);
+
+  // Judul dokumen
+  doc.setProperties({
+    title: `Laporan PKPM - ${bersih(supervisor.name)}`,
+    subject: `Penilaian Kinerja Pengawas Madrasah ${(org as OrgLike).period || '2026'}`,
+    author: bersih((org as OrgLike).chairman) || 'Pokjawas Madrasah',
+    creator: 'e-PKPM',
+  });
+
+  // Judul dokumen
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.text('LAPORAN HASIL PENILAIAN KINERJA', margin, y, { align: 'center' });
-  y += 7;
-  doc.setFontSize(11);
-  doc.text('PENGELOLAAN KINERJA PENGAWAS MADRASAH (PKPM)', margin, y, { align: 'center' });
-  y += 7;
-  doc.setFontSize(9);
+  doc.setFontSize(12);
+  doc.text('LAPORAN HASIL PENILAIAN KINERJA', 105, y, { align: 'center' });
+  y += 5.5;
+  doc.setFontSize(10);
+  doc.text('PENGELOLAAN KINERJA PENGAWAS MADRASAH (PKPM)', 105, y, { align: 'center' });
+  y += 5;
   doc.setFont('helvetica', 'normal');
-  doc.text(org.name, margin, y, { align: 'center' });
-  y += 10;
+  doc.setFontSize(9);
+  doc.text(`Periode ${(org as OrgLike).period || '2026'} · ${jenjang}`, 105, y, { align: 'center' });
+  y += 9;
 
   // Identity section
   doc.setFont('helvetica', 'bold');
@@ -69,12 +128,12 @@ function renderIndividual(
   doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'normal');
   const identity = [
-    ['Nama', ': ' + supervisor.name],
-    ['NIP', ': ' + supervisor.nip],
-    ['Pangkat / Golongan', ': ' + supervisor.rank],
+    ['Nama', ': ' + bersih(supervisor.name)],
+    ['NIP', ': ' + bersih(supervisor.nip)],
+    ['Pangkat / Golongan', ': ' + (bersih(supervisor.rank) || '-')],
     ['Jenjang Jabatan', ': ' + jenjang],
-    ['Satuan Kerja', ': ' + supervisor.workUnit],
-    ['Wilayah Binaan', ': ' + supervisor.region],
+    ['Satuan Kerja', ': ' + (bersih(supervisor.workUnit) || '-')],
+    ['Wilayah Binaan', ': ' + (bersih(supervisor.region) || '-')],
   ];
   for (const [k, v] of identity) {
     doc.setFontSize(9);
@@ -97,11 +156,11 @@ function renderIndividual(
   doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.text(`Nomor SK / Surat Tugas: ${result.skPenugasan || '-'}`, margin, y); y += 5;
-  doc.text(`Tanggal SK: ${result.tanggalSk || '-'}`, margin, y); y += 5;
-  doc.text(`Penilai: ${result.assessorId || '-'}`, margin, y); y += 5;
-  doc.text(`Mekanisme: ${result.mekanismePenilaian || 'individual'}`, margin, y); y += 5;
-  doc.text(`Tanggal Finalisasi: ${result.finalizedAt ? new Date(result.finalizedAt).toLocaleDateString('id-ID') : '-'}`, margin, y); y += 5;
+  doc.text(`Nomor SK / Surat Tugas: ${bersih(result.skPenugasan || result.skNumber) || '-'}`, margin, y); y += 5;
+  doc.text(`Tanggal SK: ${tanggalIndo(result.tanggalSk || result.skDate)}`, margin, y); y += 5;
+  doc.text(`Penilai: ${bersih(penilai) || '-'}`, margin, y); y += 5;
+  doc.text(`Mekanisme: ${bersih(result.mekanismePenilaian || result.mechanism) || 'individual'}`, margin, y); y += 5;
+  doc.text(`Tanggal Finalisasi: ${tanggalIndo(result.finalizedAt)}`, margin, y); y += 5;
 
   // Dasar Hukum
   const regulasiUtama = regulasi.filter(r => r.status === 'berlaku').slice(0, 3);
@@ -118,132 +177,195 @@ function renderIndividual(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     for (const r of regulasiUtama) {
-      doc.text(`${r.nomor} tentang ${r.tentang}`, margin, y);
-      y += 5;
+      const wrap = doc.splitTextToSize(`${bersih(r.nomor || r.number)} tentang ${bersih(r.tentang || r.title)}`, innerW);
+      doc.text(wrap, margin, y);
+      y += wrap.length * 4.2 + 1;
     }
   }
   y += 5;
 
-  // Scoring table
-  for (const [ci, comp] of (['K1', 'K2', 'K3', 'K4'] as const).entries()) {
+  // Scoring table — tiap komponen memakai huruf urut sendiri (A–D)
+  for (const comp of ['K1', 'K2', 'K3', 'K4'] as const) {
     const compIns = ins.filter(i => i.component === comp);
     if (!compIns.length) continue;
 
-    if (y > 240) { doc.addPage(); y = 25; }
+    if (y > 215) { doc.addPage(); y = 20; }
+    const info = KOMPONEN_INFO[comp];
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setFillColor(23, 63, 112);
     doc.setTextColor(255, 255, 255);
     doc.rect(margin, y, innerW, 7, 'F');
-    const labels = ['Penyusunan Program', 'Pelaksanaan Program', 'Evaluasi Hasil', 'Pembimbingan & Pelatihan'];
-    doc.text(`${comp}: ${labels[ci]} (Bobot: ${bobot[comp]}%)`, margin + 2, y + 5);
-    y += 12;
+    doc.text(`${info.urut} ${info.judul} (Bobot: ${bobot[comp]}%)`, margin + 2, y + 5);
+    y += 11;
     doc.setTextColor(0, 0, 0);
 
-    // Header row
-    doc.setFontSize(7);
-    doc.setFillColor(241, 245, 249);
-    doc.rect(margin, y, innerW, 5, 'F');
-    doc.text('No', margin + 2, y + 4);
-    doc.text('Indikator', margin + 10, y + 4);
-    doc.text('0', margin + innerW - 40, y + 4);
-    doc.text('1', margin + innerW - 30, y + 4);
-    doc.text('2', margin + innerW - 20, y + 4);
-    y += 7;
+    const hdr = ['No', 'Indikator', 'Dokumen', 'Skor', 'Kriteria Penilaian', 'Catatan'];
+    const w = [8, 62, 10, 40, 40];
+    w[2] = innerW - w[0] - w[1] - w[4] - w[3];
+    const skorCol = margin + w[0] + w[1];
+    const dokCol = skorCol + w[2];
+    const kritCol = dokCol + w[3];
+    const catCol = kritCol + w[4];
 
-    const rows = compIns.map((i, n) => {
+    doc.setFillColor(226, 232, 240);
+    doc.rect(margin, y, innerW, 6, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    let hx = margin;
+    for (const [hi, h] of hdr.entries()) {
+      doc.text(h, hx + 1.5, y + 4.2);
+      hx += w[hi];
+    }
+    y += 6;
+
+    doc.setFont('helvetica', 'normal');
+    for (const [n, i] of compIns.entries()) {
       const a = items.find(x => x.indicatorId === i.id);
       const isNA = a?.na;
       const score = a?.score;
-      return [
-        n + 1,
-        `${i.code}: ${i.title || i.description}` + (isNA ? ' (N/A)' : ''),
-        score === 0 ? '✓' : '',
-        score === 1 ? '✓' : '',
-        score === 2 ? '✓' : '',
-      ];
-    });
-    y = autoTable(doc, rows, y, margin, pageW);
+      const dok = i.documents?.length ? String(i.documents.length) : '-';
+      const krit = bersih((i.criteria as Record<string, string>)?.[String(score ?? 0)]) || (isNA ? '-' : '-');
+      const cat = bersih(a?.notes || a?.finding || '') || '-';
 
-    // Component score
-    y += 3;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.text(`Nilai ${comp}: ${calc.components[comp].toFixed(1)}`, margin, y);
-    y += 7;
-  }
+      const txtIndikator = doc.splitTextToSize(`${i.code} — ${bersih(i.title || i.description)}`, w[1] - 3);
+      const txtKriteria = doc.splitTextToSize(krit, w[4] - 3);
+      const txtCatatan = doc.splitTextToSize(cat, w[3] - 3);
+      const baris = Math.max(txtIndikator.length, txtKriteria.length, txtCatatan.length, 1);
+      const hBaris = baris * 3.4 + 2.4;
 
-  // Final result
-  if (y > 240) { doc.addPage(); y = 25; }
-  y += 3;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setFillColor(23, 63, 112);
-  doc.setTextColor(255, 255, 255);
-  doc.rect(margin, y, innerW, 7, 'F');
-  doc.text('D. Nilai Akhir dan Predikat', margin + 2, y + 5);
-  y += 12;
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Nilai K1: ${calc.components.K1.toFixed(1)} (Bobot: ${bobot.K1}%)`, margin, y); y += 5;
-  doc.text(`Nilai K2: ${calc.components.K2.toFixed(1)} (Bobot: ${bobot.K2}%)`, margin, y); y += 5;
-  doc.text(`Nilai K3: ${calc.components.K3.toFixed(1)} (Bobot: ${bobot.K3}%)`, margin, y); y += 5;
-  doc.text(`Nilai K4: ${calc.components.K4.toFixed(1)} (Bobot: ${bobot.K4}%)`, margin, y); y += 5;
-  y += 2;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text(`Nilai Akhir: ${calc.final.toFixed(2)}`, margin, y); y += 7;
-  doc.text(`Predikat: ${calc.predicate}`, margin, y); y += 7;
+      if (y + hBaris > 282) { doc.addPage(); y = 20; }
 
-  // PKB Priority
-  y += 3;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setFillColor(23, 63, 112);
-  doc.setTextColor(255, 255, 255);
-  doc.rect(margin, y, innerW, 7, 'F');
-  doc.text('E. Prioritas PKB', margin + 2, y + 5);
-  y += 12;
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  for (const p of priorities.slice(0, 8)) {
-    if (y > 260) { doc.addPage(); y = 25; }
-    const priorityIcon = p.priority === 'Sangat Tinggi' ? '🔴' : p.priority === 'Tinggi' ? '🟡' : '🟢';
-    doc.text(`${priorityIcon} ${p.code} — Skor: ${p.score} — ${p.priority}`, margin, y);
-    y += 4;
-    if (p.rekomendasiPKB) {
-      doc.setFontSize(7);
-      doc.text(`   Rekomendasi: ${p.rekomendasiPKB}`, margin + 5, y);
-      doc.setFontSize(8);
-      y += 4;
+      doc.setDrawColor(148, 163, 184);
+      doc.rect(margin, y, innerW, hBaris);
+      doc.line(skorCol, y, skorCol, y + hBaris);
+      doc.line(dokCol, y, dokCol, y + hBaris);
+      doc.line(kritCol, y, kritCol, y + hBaris);
+      doc.line(catCol, y, catCol, y + hBaris);
+
+      doc.setFontSize(7.5);
+      doc.text(String(n + 1), margin + 1.5, y + 3.6);
+      doc.text(txtIndikator, margin + w[0] + 1.5, y + 3.6);
+      doc.text(dok, dokCol + 2.5, y + 3.6);
+      const skor = isNA ? 'N/A' : String(score ?? '-');
+      doc.setFont('helvetica', isNA ? 'normal' : 'bold');
+      doc.text(skor, skorCol + w[2] / 2, y + 3.6, { align: 'center' });
+      doc.setFont('helvetica', 'normal');
+      doc.text(txtKriteria, kritCol + 1.5, y + 3.6);
+      doc.text(txtCatatan, catCol + 1.5, y + 3.6);
+      y += hBaris;
     }
+
+    // Nilai komponen + butir yang tidak berlaku pada jenjang ini
+    const nilai = calc.components[comp].toFixed(2);
+    const semuaKomponen = master.filter(i => i.component === comp && i.active !== false);
+    const luarJenjang = semuaKomponen.filter(i => !compIns.some(c => c.id === i.id)).map(i => i.code);
+    const twTeks = `Jumlah Butir Dinilai: ${compIns.length}` + (luarJenjang.length ? `  |  Tidak berlaku pada jenjang ${jenjang}: ${luarJenjang.join(', ')}` : '') + `  |  Nilai ${comp}: ${nilai}`;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setFillColor(241, 245, 249);
+    const barisFooter = doc.splitTextToSize(twTeks, innerW - 4);
+    const hFooter = barisFooter.length * 3.4 + 3;
+    doc.rect(margin, y, innerW, hFooter, 'F');
+    doc.text(barisFooter, margin + 2, y + 4);
+    y += hFooter + 4;
   }
 
-  // Signatures
-  y += 5;
-  if (y > 220) { doc.addPage(); y = 25; }
-  doc.setFontSize(9);
+  // Nilai akhir & predikat
+  if (y > 235) { doc.addPage(); y = 20; }
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setFillColor(23, 63, 112);
+  doc.setTextColor(255, 255, 255);
+  doc.rect(margin, y, innerW, 7, 'F');
+  doc.text('E. Nilai Akhir dan Predikat', margin + 2, y + 5);
+  y += 11;
+  doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'normal');
-  doc.text('Mengetahui,', margin + innerW * 0.6, y); y += 5;
-  doc.text('Kepala Kantor', margin + innerW * 0.6, y); y += 5;
-  doc.text(org.headOffice, margin + innerW * 0.6, y); y += 15;
-  doc.text('( _________________________ )', margin + innerW * 0.6, y); y += 5;
-  doc.text('NIP.', margin + innerW * 0.6, y); y += 5;
+  doc.setFontSize(9);
 
-  y = 140;
-  doc.text('Ketua Pokjawas,', margin, y); y += 5;
-  doc.text(org.chairman, margin, y); y += 15;
-  doc.text('( _________________________ )', margin, y); y += 5;
-  doc.text('NIP.', margin, y);
+  // Tabel nilai komponen
+  const kolW = innerW / 5;
+  doc.setFillColor(241, 245, 249);
+  doc.rect(margin, y, innerW, 6, 'F');
+  doc.setFont('helvetica', 'bold');
+  const head = ['Komponen', 'K1', 'K2', 'K3', 'K4'];
+  head.forEach((h, i) => doc.text(h, margin + kolW * i + 2, y + 4.2));
+  y += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.rect(margin, y, innerW, 6);
+  const nilaiBaris = ['Nilai (0–100)', ...['K1', 'K2', 'K3', 'K4'].map(k => (calc.components as Record<string, number>)[k].toFixed(2))];
+  nilaiBaris.forEach((v, i) => doc.text(v, margin + kolW * i + 2, y + 4.2));
+  y += 6;
+  doc.rect(margin, y, innerW, 6);
+  const bobotBaris = ['Bobot', ...['K1', 'K2', 'K3', 'K4'].map(k => `${(bobot as Record<string, number | undefined>)[k] ?? 0}%`)];
+  bobotBaris.forEach((v, i) => doc.text(v, margin + kolW * i + 2, y + 4.2));
+  y += 11;
 
-  // QR code placeholder + verification note
+  doc.setFontSize(10);
+  doc.text('Nilai Akhir (Prestasi Kerja):', margin, y);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text(calc.final.toFixed(2), margin + 62, y);
+  doc.setFontSize(10);
+  doc.text('Predikat:', margin + 92, y);
+  doc.text(bersih(calc.predicate), margin + 112, y);
+  y += 11;
+
+  // Prioritas PKB
+  if (y > 240) { doc.addPage(); y = 20; }
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setFillColor(23, 63, 112);
+  doc.setTextColor(255, 255, 255);
+  doc.rect(margin, y, innerW, 7, 'F');
+  doc.text('F. Prioritas Pengembangan Keprofesian Berkelanjutan (PKB)', margin + 2, y + 5);
+  y += 11;
+  doc.setTextColor(0, 0, 0);
+
+  const wPkb = [16, 12, 30, innerW - 16 - 12 - 30];
+  const pkbKodeCol = margin + wPkb[0];
+  const pkbSkorCol = pkbKodeCol + wPkb[1];
+  const pkbPrioCol = pkbSkorCol + wPkb[2];
+  doc.setFillColor(241, 245, 249);
+  doc.rect(margin, y, innerW, 6, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.text('Kode', margin + 1.5, y + 4.2);
+  doc.text('Skor', pkbKodeCol + 1.5, y + 4.2);
+  doc.text('Kategori', pkbSkorCol + 1.5, y + 4.2);
+  doc.text('Rekomendasi PKB', pkbPrioCol + 1.5, y + 4.2);
+  y += 6;
+  doc.setFont('helvetica', 'normal');
+  for (const p of priorities.slice(0, 10)) {
+    const rek = bersih(p.rekomendasiPKB) || '-';
+    const tRek = doc.splitTextToSize(rek, wPkb[3] - 3);
+    const hBaris = Math.max(tRek.length, 1) * 3.6 + 2.6;
+    if (y + hBaris > 282) { doc.addPage(); y = 20; }
+    doc.setDrawColor(148, 163, 184);
+    doc.rect(margin, y, innerW, hBaris);
+    doc.line(pkbKodeCol, y, pkbKodeCol, y + hBaris);
+    doc.line(pkbSkorCol, y, pkbSkorCol, y + hBaris);
+    doc.line(pkbPrioCol, y, pkbPrioCol, y + hBaris);
+    doc.setFontSize(7.5);
+    doc.text(bersih(p.code), margin + 1.5, y + 3.8);
+    doc.text(String(p.score), pkbKodeCol + 1.5, y + 3.8);
+    doc.text(bersih(p.priority), pkbSkorCol + 1.5, y + 3.8);
+    doc.text(tRek, pkbPrioCol + 1.5, y + 3.8);
+    y += hBaris;
+  }
+  y += 4;
+
+  // Tanda tangan
+  if (y > 215) { doc.addPage(); y = 20; }
+  const kota = bersih((org as OrgLike).district).replace(/^kabupaten\s+/i, '') || 'Jember';
+  tandaTangan(doc, org, kota);
+
+  // Catatan verifikasi
   doc.setFontSize(7);
   doc.setTextColor(100, 100, 100);
-  const verifyUrl = `https://pkpm.pokjawasjember.com/verify/${result.id}`;
-  doc.text(`Verifikasi: ${verifyUrl}`, margin, 280);
+  doc.text(`Dokumen ini diterbitkan melalui e-PKPM. Verifikasi keaslian: https://pkpm.pokjawasjember.com/verify/${bersih(result.id)}`, margin, 288);
 }
 
 /** PDF laporan individu untuk satu pengawas. */
@@ -253,10 +375,11 @@ export async function generateIndividualPdf(
   master: Indicator[],
   result: Result,
   regulasi: Regulasi[],
-  org: { name: string; chairman: string; headOffice: string },
+  org: OrgLike,
+  penilai?: string,
 ) {
   const doc = new jsPDF({ format: 'a4', unit: 'mm' });
-  renderIndividual(doc, supervisor, items, master, result, regulasi, org);
+  renderIndividual(doc, supervisor, items, master, result, regulasi, org, penilai);
   return doc.output('blob');
 }
 
@@ -266,13 +389,17 @@ export async function generateIndividualPdf(
  */
 export async function generateBatchPdf(
   entries: { supervisor: Supervisor; items: Assessment[]; master: Indicator[]; result: Result; regulasi: Regulasi[] }[],
-  org: { name: string; chairman: string; headOffice: string },
+  org: OrgLike,
+  users?: { id: string; name: string }[],
 ) {
   const doc = new jsPDF({ format: 'a4', unit: 'mm' });
   entries.forEach((e, i) => {
     if (i > 0) doc.addPage();
-    renderIndividual(doc, e.supervisor, e.items, e.master, e.result, e.regulasi, org);
+    const penilai = users?.find(u => u.id === e.result.assessorId)?.name;
+    renderIndividual(doc, e.supervisor, e.items, e.master, e.result, e.regulasi, org, penilai);
   });
+  const tanggal = new Date().toISOString().slice(0, 10);
+  doc.setProperties({ title: `Rekap Laporan PKPM ${tanggal}`, creator: 'e-PKPM' });
   return doc.output('blob');
 }
 
