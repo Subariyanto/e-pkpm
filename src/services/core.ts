@@ -1,5 +1,6 @@
 import { db, audit } from '../lib/db';
 import { indicators as newIndicators, supervisors, users, regulasiData, BOBOT_DEFAULT, PREDIKAT_DEFAULT } from '../data/demo';
+import { indicatorsV2 } from '../data/instruments-v2';
 import type { Assessment, Indicator, Result, PredikatRow, BobotKomponen, Jenjang } from '../types';
 
 export async function sha256(v: string) {
@@ -37,6 +38,24 @@ function sha256Fallback(s: string) {
     h=g;g=f;f=e;e=(d+t1)>>>0;d=c;c=b;b=a;a=(t1+t2)>>>0;
   }
   return [a,b,c,d,e,f,g,h].map(x=>(x>>>0).toString(16).padStart(8,'0')).join('');
+}
+
+/**
+ * Pastikan butir instrumen baku PKPM selalu tersedia di perangkat.
+ *
+ * Dijalankan otomatis saat aplikasi dibuka sehingga daftar indikator di menu
+ * Penilaian V2 selalu terisi, termasuk pada perangkat yang datanya belum
+ * lengkap atau hasil impor paket lama (versi 'legacy'). Butir yang sudah ada
+ * tidak diubah dan data penilaian tidak pernah dihapus.
+ */
+export async function ensureInstrumenBaku(): Promise<number> {
+  const semua = await db.indicators.toArray();
+  const kodeAda = new Set(semua.map(x => (x.code || '').toUpperCase().trim()).filter(Boolean));
+  const baru = indicatorsV2.filter(x => !kodeAda.has((x.code || '').toUpperCase().trim()));
+  if (!baru.length) return 0;
+  await db.indicators.bulkPut(baru);
+  await audit('SINKRON_INSTRUMEN', 'Instrumen baku', `${baru.length} butir dilengkapi otomatis`);
+  return baru.length;
 }
 
 export async function seedDemo() {
