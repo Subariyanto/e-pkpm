@@ -44,6 +44,8 @@ export function Activation({ onReady }: { onReady: () => void }) {
     localStorage.setItem('pkpm_device_name', device || 'Perangkat');
     localStorage.setItem('pkpm_account_code', namaAkun);
     sessionStorage.setItem('userName', namaLengkap || namaAkun);
+    // Peran default untuk akun pengawas; admin ditandai setelah verifikasi berkala.
+    if (!sessionStorage.getItem('userRole')) sessionStorage.setItem('userRole', 'user');
     onReady();
   }
 
