@@ -258,6 +258,33 @@ export async function saveResult(
 }
 
 // Jenjang filter helper
+/**
+ * Instrumen yang dipakai penilaian periode berjalan.
+ *
+ * Diambil dari: butir versi pkpm-0-2-v2 (versi utama saat ini) bila tersedia,
+ * jika tidak ada (data lama/legacy atau hasil impor paket) semua instrumen aktif
+ * dipakai supaya daftar indikator tidak pernah kosong.
+ */
+export function instrumenAktif(master: Indicator[]): Indicator[] {
+  const v2 = master.filter(i => i.versiInstrumen === 'pkpm-0-2-v2');
+  const dasar = v2.length ? v2 : master.filter(i => i.versiInstrumen === 'legacy-1-4');
+  const dipakai = dasar.length ? dasar : master;
+  return dipakai.filter(i => i.active !== false);
+}
+
+/**
+ * Filter instrumen sesuai jenjang jabatan pengawas.
+ *
+ * Toleran terhadap data lama/suntingan admin yang belum mengisi `jenjangBerlaku`:
+ * selama instrumennya aktif, butir tersebut tetap ditampilkan untuk semua jenjang.
+ * Sebelumnya butir tanpa jenjang ikut tersaring habis sehingga daftar komponen
+ * bisa kosong dan nilai akhir tampil 0,00.
+ */
 export function indicatorsForJenjang(master: Indicator[], jenjang: string): Indicator[] {
-  return master.filter(i => (i.jenjangBerlaku || []).includes(jenjang as Jenjang));
+  return master.filter(i => {
+    if (i.active === false) return false;
+    const j = (i.jenjangBerlaku || i.levels || []) as string[];
+    if (!j.length) return true; // jenjang belum diisi → anggap berlaku untuk semua
+    return j.includes(jenjang);
+  });
 }

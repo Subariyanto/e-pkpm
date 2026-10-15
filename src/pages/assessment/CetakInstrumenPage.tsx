@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../lib/db';
 import { Button, Card, PageTitle, TABLE_CELL } from '../../components/Layout';
-import { calculate, indicatorsForJenjang } from '../../services/core';
+import { calculate, indicatorsForJenjang, instrumenAktif } from '../../services/core';
 import { AUTO_ISI } from '../../data/demo';
 import { emptyAssessment, COMP_KEYS } from './helpers';
 import { nilaiKomponen } from './IndicatorList';
@@ -91,7 +91,7 @@ export function CetakInstrumenPage() {
   const jenjang = (supervisor?.level || 'Madya') as 'Muda' | 'Madya' | 'Utama';
 
   const ins = useMemo(
-    () => indicatorsForJenjang(allIns.filter(i => i.versiInstrumen === 'pkpm-0-2-v2'), jenjang),
+    () => indicatorsForJenjang(instrumenAktif(allIns), jenjang),
     [allIns, jenjang],
   );
 

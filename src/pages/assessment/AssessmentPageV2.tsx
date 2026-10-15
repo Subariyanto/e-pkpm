@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, audit } from '../../lib/db';
 import { Button, Card, PageTitle } from '../../components/Layout';
-import { saveResult, validateFinalization, indicatorsForJenjang, calculate } from '../../services/core';
+import { saveResult, validateFinalization, indicatorsForJenjang, calculate, instrumenAktif } from '../../services/core';
 import { CATATAN_OTOMATIS, NA_NOTE } from '../../data/demo';
 import { STEPS, COMP_KEYS, emptyAssessment } from './helpers';
 import { ProgressSteps } from './ProgressSteps';
@@ -31,7 +31,7 @@ export function AssessmentPageV2() {
   const jenjang = (supervisor?.level || 'Madya') as 'Muda' | 'Madya' | 'Utama';
 
   const ins = useMemo(
-    () => indicatorsForJenjang(allIns.filter(i => i.versiInstrumen === 'pkpm-0-2-v2'), jenjang),
+    () => indicatorsForJenjang(instrumenAktif(allIns), jenjang),
     [allIns, jenjang],
   );
   const stepIns = step >= 1 ? ins.filter(i => i.component === COMP_KEYS[step - 1]) : [];

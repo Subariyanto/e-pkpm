@@ -6,6 +6,7 @@ import { Pencil, Trash2 } from 'lucide-react';
 import type { Indicator, Period, PredikatRow, BobotKomponen } from '../types';
 import { validatePredicates } from '../services/core';
 import { BOBOT_DEFAULT, PREDIKAT_DEFAULT } from '../data/demo';
+import { indicatorsV2 } from '../data/instruments-v2';
 
 const Field = ({ label, value, onChange, type = 'text' }: { label: string; value: any; onChange: (v: any) => void; type?: string }) => (
   <label className="text-sm">{label}<input type={type} className="input mt-1" value={value} onChange={e => onChange(type === 'number' ? Number(e.target.value) : e.target.value)} /></label>
@@ -25,6 +26,23 @@ export function InstrumentAdmin() {
   const data = useLiveQuery(() => db.indicators.orderBy('order').toArray(), []) || [];
   const [form, setForm] = useState<Indicator | null>(null);
   const [activeTab, setActiveTab] = useState<'basic' | 'advanced'>('basic');
+  const [pesanSinkron, setPesanSinkron] = useState('');
+
+  /**
+   * Menambahkan kembali butir instrumen baku yang belum ada (mis. karena data
+   * perangkat lama atau hasil impor paket yang tidak lengkap). Tidak menyentuh
+   * butir yang sudah ada dan tidak menghapus data penilaian.
+   */
+  async function sinkronBaku() {
+    const kodeAda = new Set(data.map(x => (x.code || '').toUpperCase()));
+    const baru = indicatorsV2.filter(x => !kodeAda.has((x.code || '').toUpperCase()));
+    if (!baru.length) {
+      return setPesanSinkron(`Semua ${indicatorsV2.length} butir instrumen baku sudah tersedia. Tidak ada yang perlu ditambahkan.`);
+    }
+    await db.indicators.bulkPut(baru);
+    await audit('SINKRON_INSTRUMEN', 'Instrumen baku', `${baru.length} butir ditambahkan`);
+    setPesanSinkron(`${baru.length} butir instrumen baku ditambahkan: ${baru.map(x => x.code).join(', ')}.`);
+  }
 
   async function save() {
     if (!form) return;
@@ -129,6 +147,21 @@ export function InstrumentAdmin() {
           </div>
         </Card>
       )}
+      {/* Pemulihan data instrumen — berguna bila daftar butir di Penilaian V2 kosong */}
+      <Card>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <b>Sinkron Instrumen Baku</b>
+            <p className="text-xs text-slate-500 mt-1">
+              Menambahkan kembali butir instrumen baku PKPM (K1–K4) yang belum ada di perangkat ini.
+              Butir yang sudah ada tidak diubah dan data penilaian tidak dihapus.
+            </p>
+          </div>
+          <Button variant="light" onClick={sinkronBaku}>Sinkron Sekarang</Button>
+        </div>
+        {pesanSinkron && <p className="text-sm text-[#173f70] bg-slate-100 rounded-lg p-2 mt-3">{pesanSinkron}</p>}
+      </Card>
+
       <div className="space-y-3">
         {data.map(x => (
           <Card key={x.id}>
