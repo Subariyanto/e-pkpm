@@ -148,7 +148,7 @@ export function AssessmentPageV2() {
           </div>
           <p className="text-xs text-slate-500 mt-3">Mekanisme penilaian: individual (satu penilai per pengawas)</p>
         </Card>
-        <div className="flex justify-end gap-3 mt-4">
+        <div className="sticky bottom-0 z-10 -mx-4 md:mx-0 mt-4 px-4 md:px-0 py-3 md:py-0 bg-slate-50/95 md:bg-transparent backdrop-blur border-t border-slate-200 md:border-0 flex justify-end gap-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:pb-0">
           <Button onClick={() => save().then(() => setStep(1))} disabled={locked || saving}>
             Simpan dan Lanjutkan <ChevronRight size={16} className="inline" />
           </Button>
@@ -212,8 +212,8 @@ export function AssessmentPageV2() {
             />
           )}
 
-          {/* Navigation */}
-          <div className="flex justify-between items-center mt-4">
+          {/* Navigation — menempel di bawah layar pada HP agar tombol selalu terlihat */}
+          <div className="sticky bottom-0 z-10 -mx-4 md:mx-0 mt-4 px-4 md:px-0 py-3 md:py-0 bg-slate-50/95 md:bg-transparent backdrop-blur border-t border-slate-200 md:border-0 flex justify-between items-center gap-2 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:pb-0">
             <Button variant="light" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>
               <ChevronLeft size={16} className="inline" /> Kembali
             </Button>
