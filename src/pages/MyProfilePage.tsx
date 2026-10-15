@@ -14,7 +14,17 @@ import { db, audit } from '../lib/db';
 import { Button, Card, PageTitle, IconButton } from '../components/Layout';
 import { emptyAssessment } from './assessment/helpers';
 import type { Supervisor } from '../types';
-import { UserRound, Plus, Trash2, AlertTriangle, Pencil } from 'lucide-react';
+import { UserRound, Plus, Trash2, AlertTriangle, Pencil, Save, X } from 'lucide-react';
+
+/** Data form sasaran (pengawas yang dinilai). */
+type SasaranForm = {
+  name: string; nip: string; position: string; rank: string;
+  level: string; workUnit: string; region: string; phone: string; email: string;
+};
+const FORM_KOSONG: SasaranForm = {
+  name: '', nip: '', position: 'Pengawas Madrasah', rank: '',
+  level: 'Madya', workUnit: 'Kantor Kementerian Agama Kab. Jember', region: '', phone: '', email: '',
+};
 
 /** Tabel ringkas tanpa mengimpor helper halaman lain. */
 const Table = ({ heads, rows }: { heads: string[]; rows: React.ReactNode[][] }) => (
@@ -42,6 +52,9 @@ export function MyProfilePage() {
   const [jabatan, setJabatan] = useState('');
   const [unit, setUnit] = useState('');
   const [info, setInfo] = useState('');
+  const [form, setForm] = useState<SasaranForm | null>(null);
+  const [formId, setFormId] = useState<string | null>(null); // null = mode tambah
+  const [formErr, setFormErr] = useState('');
 
   const profil = useLiveQuery(() => db.settings.get('profilPenilai'), []);
   const p = profil?.value as { nama?: string; nip?: string; jabatan?: string; unit?: string } | undefined;
@@ -68,36 +81,72 @@ export function MyProfilePage() {
     setInfo('Profil penilai tersimpan di perangkat ini.');
   }
 
-  async function tambahSasaran() {
-    const name = prompt('Nama pengawas yang dinilai');
-    if (!name) return;
-    const pin = prompt('NIP (18 digit)') || '';
-    if (!/^\d{18}$/.test(pin)) return alert('NIP wajib 18 digit angka');
-    if (p?.nip && pin === p.nip) return alert('Penilai tidak boleh menilai dirinya sendiri.');
-    if (await db.supervisors.where('nip').equals(pin).count()) return alert('NIP sudah terdaftar sebagai sasaran.');
-    const s: Supervisor = {
-      id: crypto.randomUUID(), name, nip: pin, rank: '', position: 'Pengawas Madrasah',
-      level: '', workUnit: '', region: '', schools: 0, principals: 0, teachers: 0,
-      phone: '', email: '', active: true,
-      assessorId: p?.nip || p?.nama || 'penilai-lokal',
-    };
-    await db.supervisors.add(s);
-    await audit('TAMBAH', 'Sasaran (Profil Penilai)', name);
+  /** Buka form tambah sasaran (kosong). */
+  function tambahSasaran() {
+    setFormId(null);
+    setForm({ ...FORM_KOSONG });
+    setFormErr('');
+    setInfo('');
   }
 
-  async function ubahSasaran(x: Supervisor) {
-    const name = prompt('Nama pengawas', x.name);
-    if (!name) return;
-    const nip = prompt('NIP (18 digit)', x.nip) || '';
-    if (!/^\d{18}$/.test(nip)) return alert('NIP wajib 18 digit angka');
-    if (p?.nip && nip === p.nip) return alert('Penilai tidak boleh menilai dirinya sendiri.');
+  /** Buka form ubah sasaran (terisi data yang ada). */
+  function ubahSasaran(x: Supervisor) {
+    setFormId(x.id);
+    setForm({
+      name: x.name || '', nip: x.nip || '', position: x.position || 'Pengawas Madrasah',
+      rank: x.rank || '', level: x.level || 'Madya', workUnit: x.workUnit || '',
+      region: x.region || '', phone: x.phone || '', email: x.email || '',
+    });
+    setFormErr('');
+    setInfo('');
+  }
+
+  function tutupForm() {
+    setForm(null);
+    setFormId(null);
+    setFormErr('');
+  }
+
+  /** Simpan sasaran dari form (tambah atau ubah). */
+  async function simpanSasaran() {
+    if (!form) return;
+    const name = form.name.trim();
+    const nip = form.nip.trim();
+    if (!name) return setFormErr('Nama pengawas wajib diisi.');
+    if (!/^\d{18}$/.test(nip)) return setFormErr('NIP wajib 18 digit angka.');
+    if (p?.nip && nip === p.nip) return setFormErr('Penilai tidak boleh menilai dirinya sendiri.');
     const bentrok = await db.supervisors.where('nip').equals(nip).first();
-    if (bentrok && bentrok.id !== x.id) return alert('NIP sudah dipakai sasaran lain.');
-    const position = prompt('Jabatan', x.position || 'Pengawas Madrasah') || x.position;
-    const region = prompt('Wilayah', x.region || '') ?? x.region;
-    await db.supervisors.update(x.id, { name, nip, position, region });
-    await audit('UBAH', 'Sasaran (Profil Penilai)', { name, nip }, x);
-    setInfo(`Data sasaran "${name}" diperbarui.`);
+    if (bentrok && bentrok.id !== formId) {
+      return setFormErr(`NIP ${nip} sudah dipakai sasaran "${bentrok.name}".`);
+    }
+
+    const isi = {
+      name, nip,
+      position: form.position.trim() || 'Pengawas Madrasah',
+      rank: form.rank.trim(),
+      level: form.level as Supervisor['level'],
+      workUnit: form.workUnit.trim(),
+      region: form.region.trim(),
+      phone: form.phone.trim(),
+      email: form.email.trim(),
+    };
+
+    if (formId) {
+      const lama = await db.supervisors.get(formId);
+      await db.supervisors.update(formId, isi);
+      await audit('UBAH', 'Sasaran (Profil Penilai)', isi, lama);
+      setInfo(`Data sasaran "${name}" diperbarui.`);
+    } else {
+      const s: Supervisor = {
+        id: crypto.randomUUID(), ...isi,
+        schools: 0, principals: 0, teachers: 0, active: true,
+        assessorId: p?.nip || p?.nama || 'penilai-lokal',
+      };
+      await db.supervisors.add(s);
+      await audit('TAMBAH', 'Sasaran (Profil Penilai)', isi);
+      setInfo(`Sasaran "${name}" ditambahkan. Klik "Siapkan Isian Penilaian" lalu lanjut ke menu Penilaian V2.`);
+    }
+    tutupForm();
   }
 
   async function hapusSemuaSasaran() {
@@ -208,6 +257,74 @@ export function MyProfilePage() {
             <Button size="sm" onClick={tambahSasaran}><Plus size={14} className="inline" /> Tambah Sasaran</Button>
           </div>
         </div>
+
+        {/* ===== Form Tambah/Ubah Sasaran ===== */}
+        {form && (
+          <div className="border-2 border-[#173f70]/25 rounded-xl p-4 mb-4 bg-slate-50">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-bold text-[#173f70]">
+                {formId ? 'Ubah Data Sasaran' : 'Tambah Sasaran Baru'}
+              </h4>
+              <button onClick={tutupForm} className="text-slate-400 hover:text-slate-700" title="Tutup form">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-3">
+              <label className="text-sm md:col-span-2">Nama lengkap &amp; gelar <span className="text-red-600">*</span>
+                <input className="input mt-1" value={form.name} autoFocus
+                  onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Contoh: Ahmad Fauzi, S.Pd, M.Pd." />
+              </label>
+              <label className="text-sm">NIP (18 digit) <span className="text-red-600">*</span>
+                <input className="input mt-1" value={form.nip} inputMode="numeric" maxLength={18}
+                  onChange={e => setForm({ ...form, nip: e.target.value.replace(/\D/g, '') })} placeholder="197002122005011004" />
+              </label>
+              <label className="text-sm">Jabatan
+                <input className="input mt-1" value={form.position}
+                  onChange={e => setForm({ ...form, position: e.target.value })} placeholder="Pengawas Madrasah" />
+              </label>
+              <label className="text-sm">Jenjang Jabatan
+                <select className="input mt-1" value={form.level} onChange={e => setForm({ ...form, level: e.target.value })}>
+                  {['Muda', 'Madya', 'Utama'].map(x => <option key={x}>{x}</option>)}
+                </select>
+              </label>
+              <label className="text-sm">Pangkat / Golongan
+                <input className="input mt-1" value={form.rank}
+                  onChange={e => setForm({ ...form, rank: e.target.value })} placeholder="Contoh: Pembina / IV a" />
+              </label>
+              <label className="text-sm md:col-span-2">Unit Kerja
+                <input className="input mt-1" value={form.workUnit}
+                  onChange={e => setForm({ ...form, workUnit: e.target.value })} placeholder="Kantor Kementerian Agama Kab. Jember" />
+              </label>
+              <label className="text-sm">Wilayah Binaan / KKMA
+                <input className="input mt-1" value={form.region}
+                  onChange={e => setForm({ ...form, region: e.target.value })} placeholder="Contoh: KKMA 04 Sukowono" />
+              </label>
+              <label className="text-sm">No. HP
+                <input className="input mt-1" value={form.phone} inputMode="tel"
+                  onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="08xxxxxxxxxx" />
+              </label>
+              <label className="text-sm md:col-span-2">Email
+                <input className="input mt-1" value={form.email} type="email"
+                  onChange={e => setForm({ ...form, email: e.target.value })} placeholder="nama@example.id" />
+              </label>
+            </div>
+
+            {formErr && (
+              <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-2 mt-3">{formErr}</p>
+            )}
+
+            <div className="flex gap-2 mt-4">
+              <Button onClick={simpanSasaran}>
+                <Save size={15} className="inline" /> {formId ? 'Simpan Perubahan' : 'Simpan Sasaran'}
+              </Button>
+              <Button variant="light" onClick={tutupForm}>Batal</Button>
+              <span className="text-xs text-slate-500 self-center ml-1">
+                Kolom bertanda <span className="text-red-600">*</span> wajib diisi.
+              </span>
+            </div>
+          </div>
+        )}
 
         <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
           <AlertTriangle size={16} className="text-[#173f70] mt-0.5 shrink-0" />
