@@ -25,7 +25,8 @@ function autoTable(doc: jsPDF, rows: any[], y: number, margin: number, pageW: nu
   return y;
 }
 
-export async function generateIndividualPdf(
+function renderIndividual(
+  doc: jsPDF,
   supervisor: Supervisor,
   items: Assessment[],
   master: Indicator[],
@@ -33,7 +34,6 @@ export async function generateIndividualPdf(
   regulasi: Regulasi[],
   org: { name: string; chairman: string; headOffice: string },
 ) {
-  const doc = new jsPDF({ format: 'a4', unit: 'mm' });
   const margin = 15;
   const pageW = 210;
   const innerW = pageW - margin * 2;
@@ -244,7 +244,35 @@ export async function generateIndividualPdf(
   doc.setTextColor(100, 100, 100);
   const verifyUrl = `https://pkpm.pokjawasjember.com/verify/${result.id}`;
   doc.text(`Verifikasi: ${verifyUrl}`, margin, 280);
+}
 
+/** PDF laporan individu untuk satu pengawas. */
+export async function generateIndividualPdf(
+  supervisor: Supervisor,
+  items: Assessment[],
+  master: Indicator[],
+  result: Result,
+  regulasi: Regulasi[],
+  org: { name: string; chairman: string; headOffice: string },
+) {
+  const doc = new jsPDF({ format: 'a4', unit: 'mm' });
+  renderIndividual(doc, supervisor, items, master, result, regulasi, org);
+  return doc.output('blob');
+}
+
+/**
+ * PDF gabungan berisi laporan individu seluruh pengawas.
+ * Setiap pengawas dimulai pada halaman baru.
+ */
+export async function generateBatchPdf(
+  entries: { supervisor: Supervisor; items: Assessment[]; master: Indicator[]; result: Result; regulasi: Regulasi[] }[],
+  org: { name: string; chairman: string; headOffice: string },
+) {
+  const doc = new jsPDF({ format: 'a4', unit: 'mm' });
+  entries.forEach((e, i) => {
+    if (i > 0) doc.addPage();
+    renderIndividual(doc, e.supervisor, e.items, e.master, e.result, e.regulasi, org);
+  });
   return doc.output('blob');
 }
 
@@ -334,6 +362,17 @@ export async function generateKetuaPdf(
   doc.text('( _________________________ )', margin, y);
 
   return doc.output('blob');
+}
+
+/**
+ * Buka PDF pada tab baru sehingga pengguna dapat meninjau dan memilih
+ * pengaturan cetak pada dialog cetak bawaan browser.
+ *
+ * @returns true jika tab pratinjau berhasil dibuka
+ */
+export function openPdfTab(blob: Blob): boolean {
+  const url = URL.createObjectURL(blob);
+  return !!window.open(url, '_blank');
 }
 
 export function downloadBlob(blob: Blob, filename: string) {
