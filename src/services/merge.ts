@@ -66,6 +66,60 @@ const NATURAL_KEY: Record<string, (r: any) => string | null> = {
   periods: (r) => (r.year ? `year:${r.year}` : null),
 };
 
+/**
+ * Menyusun peta id: id dari file backup → id yang dipakai di perangkat ini.
+ *
+ * Setiap perangkat membuat UUID sendiri untuk pengawas yang sama. Bila tidak
+ * disamakan, penilaian dari penilai B akan menunjuk pengawas yang tidak ada di
+ * perangkat Ketua Pokjawas (baris yatim) dan satu orang tampil dua kali.
+ * Pencocokan memakai kunci alami: NIP untuk pengawas, username untuk akun.
+ */
+async function buildIdMaps(payload: any) {
+  const supMap: Record<string, string> = {};
+  const userMap: Record<string, string> = {};
+
+  const rows: any[] = payload?.data?.supervisors || [];
+  if (Array.isArray(rows) && rows.length) {
+    const lokal = await db.supervisors.toArray();
+    const byId = new Map(lokal.map(r => [r.id, r]));
+    const byNip = new Map(lokal.filter(r => r.nip).map(r => [r.nip, r]));
+    for (const r of rows) {
+      const match = (r.id && byId.get(r.id)) || (r.nip ? byNip.get(r.nip) : undefined);
+      if (r.id) supMap[r.id] = match ? match.id : r.id;
+    }
+  }
+
+  const uRows: any[] = payload?.data?.users || [];
+  if (Array.isArray(uRows) && uRows.length) {
+    const lokal = await db.users.toArray();
+    const byId = new Map(lokal.map(r => [r.id, r]));
+    const byName = new Map(lokal.filter(r => r.username).map(r => [String(r.username).toLowerCase(), r]));
+    for (const r of uRows) {
+      const match = (r.id && byId.get(r.id)) ||
+        (r.username ? byName.get(String(r.username).toLowerCase()) : undefined);
+      if (r.id) userMap[r.id] = match ? match.id : r.id;
+    }
+  }
+
+  return { supMap, userMap };
+}
+
+/**
+ * Menyesuaikan rujukan antar tabel pada record yang datang dari backup:
+ * supervisorId / assessorId / id penilaian ditulis ulang memakai id lokal.
+ */
+function remapRow(table: string, r: any, maps: { supMap: Record<string, string>; userMap: Record<string, string> }) {
+  if (!r || typeof r !== 'object') return r;
+  const out: any = { ...r };
+  if (out.supervisorId && maps.supMap[out.supervisorId]) out.supervisorId = maps.supMap[out.supervisorId];
+  if (out.assessorId && maps.userMap[out.assessorId]) out.assessorId = maps.userMap[out.assessorId];
+  if ((table === 'assessments' || table === 'results') && out.supervisorId) {
+    if (table === 'assessments' && out.indicatorId) out.id = `${out.supervisorId}-${out.indicatorId}`;
+    if (table === 'results') out.id = `2026-${out.supervisorId}`;
+  }
+  return out;
+}
+
 /** Timestamp untuk membandingkan kebaruan; 0 bila tidak tersedia. */
 function stamp(r: any): number {
   const raw = r?.updatedAt || r?.at || r?.activationDate || r?.lastCheck || r?.createdAt;
@@ -109,9 +163,26 @@ function labelOf(table: string, r: any): string {
  * Membaca file backup dan menghitung rencana penggabungan.
  * Tidak mengubah database sama sekali — hanya membaca.
  */
+/**
+ * Membaca file backup dan menghitung rencana penggabungan.
+ * Tidak mengubah database sama sekali — hanya membaca.
+ */
 export async function planMerge(file: File): Promise<{ preview: MergePreview; payload: any }> {
-  const obj = JSON.parse(await file.text());
-  if (obj.packageType !== 'BACKUP') {
+  let obj: any;
+  try {
+    obj = JSON.parse(await file.text());
+  } catch {
+    throw new Error('File tidak dapat dibaca sebagai JSON. Pastikan file backup tidak rusak.');
+  }
+  return planMergePayload(obj);
+}
+
+/**
+ * Sama seperti `planMerge`, tetapi menerima objek backup yang sudah dibaca.
+ * Dipakai saat beberapa file digabung dulu menjadi satu payload.
+ */
+export async function planMergePayload(obj: any): Promise<{ preview: MergePreview; payload: any }> {
+  if (obj?.packageType !== 'BACKUP') {
     throw new Error('File ini bukan backup lengkap. Gunakan file hasil menu "Backup Seluruh Data".');
   }
   const org = await db.org.toCollection().first();
@@ -121,12 +192,14 @@ export async function planMerge(file: File): Promise<{ preview: MergePreview; pa
 
   const preview: MergePreview = { toAdd: {}, toUpdate: {}, conflicts: [], identical: 0, total: 0 };
   const data: Record<string, any[]> = obj.data || {};
+  const maps = await buildIdMaps(obj);
 
-  for (const [tableName, rows] of Object.entries(data)) {
-    if (!Array.isArray(rows)) continue;
+  for (const [tableName, rowsRaw] of Object.entries(data)) {
+    if (!Array.isArray(rowsRaw)) continue;
     if (SKIP_TABLES.has(tableName)) continue;
     const table = (db as any)[tableName];
     if (!table) continue;
+    const rows = rowsRaw.map(r => remapRow(tableName, r, maps));
 
     if (APPEND_ONLY.has(tableName)) {
       // Audit log: hitung berapa entri baru (yang belum ada, dinilai dari waktu+aksi+objek).
@@ -200,6 +273,12 @@ export interface MergeOptions {
   defaultResolution: 'new' | 'local';
   /** Keputusan khusus per konflik, kunci: `${table}::${key}`. */
   resolutions?: Record<string, 'new' | 'local'>;
+  /**
+   * Simpan cadangan pengaman sebelum menulis. Default true.
+   * Saat menggabung beberapa file berturut-turut, cukup sekali di awal
+   * (file berikutnya dikirim `false`) supaya tidak menumpuk cadangan besar.
+   */
+  safetyBackup?: boolean;
 }
 
 export interface MergeResult {
@@ -215,19 +294,23 @@ export interface MergeResult {
  */
 export async function runMerge(payload: any, options: MergeOptions): Promise<MergeResult> {
   // Backup pengaman sebelum menyentuh data.
-  const safety: Record<string, unknown> = {};
-  for (const t of db.tables) safety[t.name] = await t.toArray();
-  await db.settings.put({ key: `mergeBackup_${Date.now()}`, value: safety });
+  if (options.safetyBackup !== false) {
+    const safety: Record<string, unknown> = {};
+    for (const t of db.tables) safety[t.name] = await t.toArray();
+    await db.settings.put({ key: `mergeBackup_${Date.now()}`, value: safety });
+  }
 
   const result: MergeResult = { added: 0, updated: 0, keptLocal: 0, skipped: 0, perTable: {} };
   const data: Record<string, any[]> = payload.data || {};
   const resolutions = options.resolutions || {};
+  const maps = await buildIdMaps(payload);
 
-  for (const [tableName, rows] of Object.entries(data)) {
-    if (!Array.isArray(rows)) continue;
+  for (const [tableName, rowsRaw] of Object.entries(data)) {
+    if (!Array.isArray(rowsRaw)) continue;
     if (SKIP_TABLES.has(tableName)) continue;
     const table = (db as any)[tableName];
     if (!table) continue;
+    const rows = rowsRaw.map(r => remapRow(tableName, r, maps));
     result.perTable[tableName] = result.perTable[tableName] || { added: 0, updated: 0 };
 
     if (APPEND_ONLY.has(tableName)) {

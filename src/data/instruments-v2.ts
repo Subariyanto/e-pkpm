@@ -208,7 +208,51 @@ const DEFS: Def[] = [
   pkbActivity: 'Workshop penulisan laporan tahunan PKB',
   examples: E('Laporan tahunan lengkap dengan analisis dampak dan rekomendasi PKB berikutnya.', 'Laporan ada tetapi analisis dampak belum memadai.', 'Tidak ditemukan laporan tahunan pembimbingan.'),
   rtl: { problem: 'Laporan tahunan pembimbingan belum lengkap', action: 'Menyusun laporan tahunan dengan analisis dampak', product: 'Laporan tahunan pembimbingan dan pelatihan' } },
+ { code: 'K4.8', component: 'K4', title: 'Bukti Dukung Unsur Tambahan',
+  uraian: 'Memiliki bukti dukung pengembangan diri, karya inovatif, publikasi ilmiah, dan keaktifan organisasi profesi sebagai unsur penunjang kepengawasan.',
+  aspects: ['Sertifikat/laporan pengembangan diri dan surat tugas', 'Karya inovatif aplikasi pendampingan beserta laporannya', 'Buku, makalah, jurnal, PTKP, atau karya publikasi ilmiah', 'SK pengurus Pokjawas/APSI atau dokumen keaktifan organisasi profesi'],
+  docs: ['Sertifikat Pengembangan Diri, Laporan, dan Surat Tugas', 'Karya Inovatif Aplikasi Pendampingan dan Laporannya', 'Buku, Makalah, Jurnal, PTKP, atau Karya Publikasi Ilmiah', 'SK Pengurus Pokjawas/APSI atau Dokumen Keaktifan Organisasi Profesi'],
+  pkb: 'Penguatan karya pengembangan profesi dan keaktifan organisasi profesi pengawas.',
+  pkbActivity: 'Bimbingan penyusunan karya inovatif dan publikasi ilmiah',
+  examples: E('Seluruh bukti dukung unsur tambahan tersedia dan relevan.', 'Bukti dukung tersedia sebagian atau belum lengkap.', 'Tidak ditemukan bukti dukung unsur tambahan.'),
+  rtl: { problem: 'Bukti dukung unsur tambahan belum lengkap', action: 'Melengkapi sertifikat, karya inovatif, dan publikasi ilmiah', product: 'Bundel bukti dukung unsur tambahan' } },
 ];
+
+/**
+ * Pemetaan indikator e-PKPM ke RHK e-RHK (SKP 2026).
+ * Keterangan ditampilkan kecil di bawah nama indikator agar penilai tahu
+ * bundel bukti dukung mana yang harus diperiksa.
+ */
+export const RHK_MAP: Record<string, { no: number; tw: string; nama: string }[]> = {
+ 'K1.1': [{ no: 1, tw: 'I', nama: 'Dokumen Program Pendampingan Tahunan' }],
+ 'K1.2': [{ no: 5, tw: 'I', nama: 'Laporan Pembinaan dan Pendampingan Penyusunan RKTM' }],
+ 'K1.3': [{ no: 3, tw: 'I', nama: 'Dokumen Identifikasi dan Pemetaan Kondisi Layanan Kesehatan Sekolah' }],
+ 'K1.4': [{ no: 26, tw: 'IV', nama: 'Instrumen Monitoring dan Analisis Kebutuhan Guru Agama pada Madrasah Binaan' }],
+ 'K1.5': [{ no: 2, tw: 'I', nama: 'Dokumen Evaluasi Perangkat Kurikulum Madrasah' }],
+ 'K1.6': [{ no: 4, tw: 'I', nama: 'Dokumen Analisis Data Hasil Asesmen Literasi dan Numerasi' }],
+ 'K2.1': [{ no: 13, tw: 'III', nama: 'Laporan Pendampingan Klinis Penerapan Pembelajaran Mendalam melalui Supervisi Akademik' }],
+ 'K2.2': [{ no: 9, tw: 'II', nama: 'Laporan Pendampingan Penyusunan/Reviu Kurikulum Madrasah yang Mengintegrasikan Pembelajaran Mendalam dan Kurikulum Berbasis Cinta' }],
+ 'K2.3': [{ no: 11, tw: 'II', nama: 'Laporan Pembinaan, Pendampingan, Monitoring, dan Evaluasi Pengembangan Perangkat Kurikulum Madrasah' }],
+ 'K2.4': [{ no: 19, tw: 'IV', nama: 'Dokumen Pengumpulan Data, Analisis Hasil Pendampingan, dan Evaluasi Dampak Pendampingan' }],
+ 'K3.1': [{ no: 14, tw: 'III', nama: 'Laporan Evaluasi Implementasi Kebijakan Kurikulum pada Madrasah Binaan' }],
+ 'K3.2': [{ no: 15, tw: 'III', nama: 'Laporan Pembinaan dan Pendampingan Pemenuhan Standar Satuan Pendidikan Unggul' }],
+ 'K3.3': [{ no: 22, tw: 'IV', nama: 'Laporan Pembinaan, Pendampingan, Monitoring, dan Evaluasi Pemenuhan Kualifikasi dan Kompetensi Tenaga Kependidikan' }],
+ 'K3.4': [{ no: 19, tw: 'IV', nama: 'Dokumen Pengumpulan Data, Analisis Hasil Pendampingan, dan Evaluasi Dampak Pendampingan' }],
+ 'K3.5': [{ no: 7, tw: 'II', nama: 'Laporan Pendampingan Kolaboratif Bersama Kepala Madrasah dan Komite' }],
+ 'K4.1': [{ no: 21, tw: 'IV', nama: 'Laporan Pembinaan Perencanaan Kebutuhan Guru' }],
+ 'K4.2': [{ no: 25, tw: 'IV', nama: 'Laporan Pembinaan dan Pendampingan Pengembangan Kegiatan Ekstrakurikuler' }],
+ 'K4.3': [{ no: 12, tw: 'II', nama: 'Laporan Pendampingan Pemenuhan Standar Akreditasi melalui Pembinaan Tata Kelola Madrasah' }],
+ 'K4.4': [{ no: 17, tw: 'III', nama: 'Laporan Pembinaan dan Pendampingan Pengembangan Prestasi Peserta Didik' }],
+ 'K4.5': [{ no: 8, tw: 'II', nama: 'Dokumen Keaktifan dalam Organisasi Profesi dan Jejaring Pengawas' }],
+ 'K4.6': [{ no: 20, tw: 'IV', nama: 'Dokumen Karya Inovasi atau Best Practice Kepengawasan Berbasis Kepemimpinan Kasih Sayang' }],
+ 'K4.7': [{ no: 18, tw: 'III', nama: 'Laporan Pembinaan dan Pendampingan Peningkatan Profesionalisme Guru' }],
+ 'K4.8': [
+  { no: 27, tw: 'Tambahan', nama: 'Sertifikat Pengembangan Diri, Laporan, dan Surat Tugas' },
+  { no: 28, tw: 'Tambahan', nama: 'Karya Inovatif Aplikasi Pendampingan dan Laporannya' },
+  { no: 29, tw: 'Tambahan', nama: 'Buku, Makalah, Jurnal, PTKP, atau Karya Publikasi Ilmiah' },
+  { no: 30, tw: 'Tambahan', nama: 'SK Pengurus Pokjawas/APSI atau Dokumen Keaktifan Organisasi Profesi' },
+ ],
+};
 
 export const COMPONENT_TITLES: Record<ComponentKey, string> = {
  K1: 'K1 — Penyusunan Program Pengawasan',

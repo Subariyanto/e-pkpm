@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, audit } from '../../lib/db';
 import { Button, Card, PageTitle } from '../../components/Layout';
-import { saveResult, validateFinalization, indicatorsForJenjang } from '../../services/core';
+import { saveResult, validateFinalization, indicatorsForJenjang, calculate } from '../../services/core';
 import { CATATAN_OTOMATIS, NA_NOTE } from '../../data/demo';
 import { STEPS, COMP_KEYS, emptyAssessment } from './helpers';
 import { ProgressSteps } from './ProgressSteps';
+import { IndicatorList } from './IndicatorList';
+import { RHK_MAP } from '../../data/instruments-v2';
 import { IndicatorModal } from './IndicatorModal';
 import type { Assessment, Indicator } from '../../types';
 import { Search, ChevronRight, ChevronLeft, Save, CheckCircle2 } from 'lucide-react';
@@ -45,6 +47,18 @@ export function AssessmentPageV2() {
 
   const result = useLiveQuery(() => (pid ? db.results.get(`2026-${pid}`) : undefined), [pid]);
   const locked = result?.status === 'final';
+
+  /**
+   * Hasil hitung langsung dari centang yang sedang di layar (belum disimpan).
+   * Dipakai agar Nilai Akhir kanan atas ikut berubah begitu skor diklik.
+   */
+  const live = useMemo(() => {
+    const rows = ins.map(i => {
+      const f = forms[i.id] || {};
+      return { ...emptyAssessment(pid, supervisor?.assessorId || 'u1', i.id), ...f, indicatorId: i.id } as Assessment;
+    });
+    return calculate(rows, ins);
+  }, [ins, forms, pid, supervisor?.assessorId]);
 
   const update = useCallback((id: string, v: Partial<Assessment>) => {
     setForms(x => ({ ...x, [id]: { ...x[id], ...v } }));
@@ -143,7 +157,7 @@ export function AssessmentPageV2() {
     );
   }
 
-  // === STEPS 1–4: Tabel Penilaian ===
+  // === STEPS 1–4: Kartu penilaian gaya PKKM + panel ringkasan ===
   return (
     <>
       <PageTitle
@@ -156,104 +170,46 @@ export function AssessmentPageV2() {
         ) : undefined}
       />
 
-      <Card className="mb-4">
-        <select className="input" value={pid} onChange={e => { setPid(e.target.value); setStep(0); }}>
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <select className="input flex-1 min-w-[240px]" value={pid} onChange={e => { setPid(e.target.value); setStep(0); }}>
           <option value="">Pilih Pengawas yang Dinilai</option>
           {ps.map(p => <option value={p.id} key={p.id}>{p.name} — {p.level}</option>)}
         </select>
-      </Card>
+        {lastSaved && <span className="text-xs text-slate-400">Tersimpan: {lastSaved}</span>}
+
+        {/* ===== Nilai Akhir — kanan atas ===== */}
+        {pid && step >= 1 && (
+          <div className="ml-auto text-right">
+            <p className="text-[11px] uppercase tracking-wide text-slate-500">Nilai Akhir</p>
+            <p className="text-3xl font-extrabold text-[#173f70] leading-none my-1">
+              {live.final.toFixed(2)}
+            </p>
+            <p className="text-sm font-semibold text-emerald-700">{live.predicate}</p>
+            <p className="text-[11px] text-slate-500">Skala Skor 0–2</p>
+          </div>
+        )}
+      </div>
 
       {pid && (
         <>
           <ProgressSteps step={step} setStep={setStep} done={stepDone} />
 
           {step >= 1 && (
-            <Card>
-              <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
-                <div>
-                  <h3 className="font-bold text-[#173f70]">{STEPS[step]}</h3>
-                  <p className="text-xs text-slate-500">Klik indikator untuk membuka detail penggalian data</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="badge">Skala Skor 0–2</span>
-                  {lastSaved && <span className="text-xs text-slate-400">Tersimpan: {lastSaved}</span>}
-                </div>
-              </div>
-
-              {/* Desktop table */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-100">
-                      <th className="p-3 text-left w-10">No</th>
-                      <th className="p-3 text-left">Indikator</th>
-                      <th className="p-3 text-center w-14">0</th>
-                      <th className="p-3 text-center w-14">1</th>
-                      <th className="p-3 text-center w-14">2</th>
-                      <th className="p-3 text-left w-64">Catatan</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stepIns.map((i, n) => {
-                      const f = forms[i.id] || {};
-                      const isNA = f.na;
-                      return (
-                        <tr key={i.id} className={`border-b ${isNA ? 'bg-slate-100 text-slate-400' : ''}`}>
-                          <td className="p-3">{n + 1}</td>
-                          <td className="p-3">
-                            <button type="button" disabled={locked} onClick={() => setActive(i)} className="text-left group">
-                              <span className="text-blue-600 group-hover:underline text-sm font-medium">{i.code} — {i.title}</span>
-                              <Search size={13} className="inline ml-1 text-slate-400" />
-                              {isNA && <span className="ml-2 text-xs bg-slate-300 text-slate-600 px-2 py-0.5 rounded-full">N/A</span>}
-                            </button>
-                          </td>
-                          {([0, 1, 2] as const).map(s => (
-                            <td key={s} className="p-3 text-center">
-                              <input type="radio" name={`score-${i.id}`} disabled={locked || isNA} checked={f.score === s}
-                                onChange={() => update(i.id, { score: s, notes: f.notes && f.notes !== CATATAN_OTOMATIS[f.score ?? -1] ? f.notes : CATATAN_OTOMATIS[s], na: false, naReason: '' })}
-                                className="w-4 h-4 accent-teal-600" />
-                            </td>
-                          ))}
-                          <td className="p-3">
-                            <textarea disabled={locked || isNA} className="input !py-1 text-xs min-h-[40px]" value={f.notes || ''}
-                              placeholder={isNA ? NA_NOTE : 'Catatan otomatis saat memilih skor'}
-                              onChange={e => update(i.id, { notes: e.target.value })} />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Mobile cards */}
-              <div className="md:hidden space-y-3">
-                {stepIns.map((i, n) => {
-                  const f = forms[i.id] || {};
-                  const isNA = f.na;
-                  return (
-                    <div key={i.id} className={`border rounded-lg p-3 ${isNA ? 'bg-slate-100' : ''}`}>
-                      <button type="button" disabled={locked} onClick={() => setActive(i)} className="text-left w-full">
-                        <span className="text-blue-600 text-sm font-medium">{n + 1}. {i.code} — {i.title}</span>
-                        <Search size={13} className="inline ml-1 text-slate-400" />
-                        {isNA && <span className="ml-2 text-xs bg-slate-300 text-slate-600 px-2 py-0.5 rounded-full">N/A</span>}
-                      </button>
-                      <div className="flex gap-2 mt-2">
-                        {([0, 1, 2] as const).map(s => (
-                          <button key={s} type="button" disabled={locked || isNA}
-                            onClick={() => update(i.id, { score: s, notes: f.notes && f.notes !== CATATAN_OTOMATIS[f.score ?? -1] ? f.notes : CATATAN_OTOMATIS[s], na: false, naReason: '' })}
-                            className={`flex-1 py-2 rounded-lg border-2 text-center text-sm font-bold ${f.score === s ? 'border-teal-600 bg-teal-600 text-white' : 'border-slate-300'}`}>
-                            {s}
-                          </button>
-                        ))}
-                      </div>
-                      <textarea disabled={locked || isNA} className="input !py-1 text-xs mt-2 min-h-[36px]" value={f.notes || ''}
-                        placeholder={isNA ? NA_NOTE : 'Catatan'} onChange={e => update(i.id, { notes: e.target.value })} />
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
+            <IndicatorList
+              indicators={stepIns}
+              forms={forms}
+              locked={!!locked}
+              onScore={(id, s, noteLama) =>
+                update(id, {
+                  score: s,
+                  notes: noteLama !== undefined ? noteLama : CATATAN_OTOMATIS[s],
+                  na: false,
+                  naReason: '',
+                })
+              }
+              onOpenDetail={i => setActive(i)}
+              rhkOf={code => RHK_MAP[code || '']}
+            />
           )}
 
           {/* Navigation */}
@@ -289,6 +245,7 @@ export function AssessmentPageV2() {
           onClose={() => setActive(null)}
           onUpdate={v => update(active.id, v)}
           onEditIndicator={() => { setActive(null); /* navigate to admin config */ }}
+          buktiDukung={RHK_MAP[active.code || '']}
         />
       )}
     </>

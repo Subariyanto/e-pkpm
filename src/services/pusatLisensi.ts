@@ -316,15 +316,18 @@ export async function adminLogin(
   username: string,
   password: string,
 ): Promise<{ success: boolean; reason: string; admin_key?: string; username?: string; fullname?: string }> {
+  const password_hash = await sha256(`admin:${password}`);
   try {
-    const password_hash = await sha256(`admin:${password}`);
     return await callRpc('admin_login', {
       p_app_slug: APP_SLUG,
       p_username: username,
       p_password_hash: password_hash,
     });
-  } catch {
-    return { success: false, reason: 'network_error' };
+  } catch (e: any) {
+    // Jangan telan pesan asli: hanya error jaringan yang jadi network_error.
+    const msg = String(e?.message || e);
+    const jaringan = /Timeout|Failed to fetch|NetworkError|load failed/i.test(msg);
+    return { success: false, reason: jaringan ? 'network_error' : 'error', error: msg } as any;
   }
 }
 

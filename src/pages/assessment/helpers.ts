@@ -14,7 +14,8 @@ export function emptyAssessment(pid: string, assessorId: string, indicatorId: st
   return {
     id: `${pid}-${indicatorId}`, supervisorId: pid, assessorId, periodId: '2026',
     indicatorId, documentName: '', documentNumber: '', documentDate: '', documentStatus: '',
-    documentFound: false, aspekChecklist: [], aspekPercent: 0, recommendedScore: 0,
+    documentFound: false, dokumenDitemukan: {}, dokumenJumlah: 0, dokumenTotal: 0,
+    aspekChecklist: [], aspekPercent: 0, recommendedScore: 0,
     score: undefined, na: false, naReason: '', notes: '', review: '', finding: '',
     recommendation: '', telaahDokumen: '', wawancara: '', konfirmasi: '', konsistensi: '',
     rtlMasalah: '', rtlAkarMasalah: '', rtlTindakan: '', rtlProduk: '', rtlBentukPKB: '',

@@ -233,6 +233,60 @@ export const CATATAN_OTOMATIS: Record<number, string> = {
   2: 'Terlaksana secara lengkap dan sesuai; bukti relevan, hasil dapat diverifikasi, dan tindak lanjut tersedia.',
 };
 
+/**
+ * Isi otomatis Catatan dan Temuan + Rencana Tindak Lanjut berdasarkan perolehan skor.
+ * Pengawas/penilai tetap dapat mengedit manual setelahnya.
+ */
+export const AUTO_ISI: Record<number, {
+  notes: string;
+  recommendation: string;
+  review: string;
+  finding: string;
+  rtlMasalah: string;
+  rtlAkarMasalah: string;
+  rtlTindakan: string;
+  rtlProduk: string;
+  rtlBentukPKB: string;
+  rtlStatus: string;
+}> = {
+  0: {
+    notes: CATATAN_OTOMATIS[0],
+    recommendation: 'Belum ada kekuatan yang dapat dicatat karena bukti dukung belum ditemukan.',
+    review: 'Program atau kegiatan belum terlaksana. Dokumen pendukung tidak ditemukan pada saat penilaian.',
+    finding: 'Tidak ditemukan bukti pelaksanaan maupun dokumen pendukung untuk indikator ini.',
+    rtlMasalah: 'Program/kegiatan pada indikator ini belum terlaksana dan bukti dukung belum tersedia.',
+    rtlAkarMasalah: 'Belum ada perencanaan, penugasan, atau pelaksanaan yang terdokumentasi.',
+    rtlTindakan: 'Menyusun rencana pelaksanaan dan menyiapkan dokumen pendukung yang dipersyaratkan.',
+    rtlProduk: 'Program/kegiatan beserta dokumen bukti dukung yang lengkap.',
+    rtlBentukPKB: 'Mentoring/Coaching',
+    rtlStatus: 'Belum dimulai',
+  },
+  1: {
+    notes: CATATAN_OTOMATIS[1],
+    recommendation: 'Kegiatan sudah berjalan dan ada itikad pelaksanaan, tetapi hasil belum terdokumentasi secara utuh.',
+    review: 'Bukti dukung baru sebagian. Analisis, hasil, dan tindak lanjut belum lengkap atau belum terdokumentasi.',
+    finding: 'Pelaksanaan kegiatan ditemukan, namun belum didukung kelengkapan dokumen, analisis, dan tindak lanjut sesuai yang dipersyaratkan.',
+    rtlMasalah: 'Kelengkapan bukti dukung dan tindak lanjut hasil kegiatan belum memadai.',
+    rtlAkarMasalah: 'Dokumentasi kegiatan belum tertib dan analisis hasil belum disusun secara sistematis.',
+    rtlTindakan: 'Melengkapi dokumen, menyusun analisis hasil, dan menetapkan tindak lanjut yang terukur.',
+    rtlProduk: 'Dokumen bukti dukung lengkap beserta analisis hasil dan rencana tindak lanjut.',
+    rtlBentukPKB: 'Workshop',
+    rtlStatus: 'Berjalan',
+  },
+  2: {
+    notes: CATATAN_OTOMATIS[2],
+    recommendation: 'Kegiatan terlaksana lengkap, bukti dukung relevan, hasil terverifikasi, dan tindak lanjut sudah tersedia.',
+    review: 'Tidak ditemukan ketidaksesuaian yang berarti pada indikator ini.',
+    finding: 'Seluruh komponen terpenuhi: perencanaan, pelaksanaan, bukti dukung, analisis hasil, dan tindak lanjut.',
+    rtlMasalah: 'Tidak ada masalah pokok; yang diperlukan adalah pemeliharaan dan penguatan mutu.',
+    rtlAkarMasalah: 'Sistem kerja dan dokumentasi sudah berjalan dengan baik.',
+    rtlTindakan: 'Mempertahankan mutu pelaksanaan dan mendiseminasikan praktik baik kepada pengawas lain.',
+    rtlProduk: 'Dokumen praktik baik (best practice) dan hasil diseminasi.',
+    rtlBentukPKB: 'Publikasi Ilmiah',
+    rtlStatus: 'Terverifikasi',
+  },
+};
+
 export const NA_NOTE = 'Tidak berlaku sesuai jenjang jabatan atau penugasan pengawas.';
 
 // === USERS & SUPERVISORS (unchanged) ===

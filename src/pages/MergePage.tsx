@@ -1,16 +1,32 @@
 /**
  * Halaman Penggabungan Data (Merge) — Opsi A.
  *
- * Alur: pilih file backup perangkat lain -> pratinjau (apa yang akan
- * ditambahkan/diperbarui, mana yang bentrok) -> putuskan konflik -> jalankan.
- * Tidak ada data lokal yang dihapus.
+ * Alur: pilih satu atau beberapa file backup perangkat lain -> pratinjau
+ * (apa yang akan ditambahkan/diperbarui, mana yang bentrok) -> putuskan
+ * konflik -> jalankan. Tidak ada data lokal yang dihapus.
+ *
+ * Beberapa file boleh dimasukkan sekaligus (mis. hasil kerja seluruh tim
+ * penilai). Pratinjau dihitung dari gabungan semua file, tetapi penggabungan
+ * tetap dijalankan per file agar keputusan konflik tetap terpisah dan jelas.
  */
 import { useState } from 'react';
 import { Button, Card, PageTitle } from '../components/Layout';
-import { planMerge, runMerge, type ConflictItem, type MergePreview, type MergeResult } from '../services/merge';
-import { AlertTriangle, CheckCircle2, FileUp, GitMerge, Plus, RefreshCw } from 'lucide-react';
+import {
+  planMergePayload,
+  runMerge,
+  type ConflictItem,
+  type MergePreview,
+  type MergeResult,
+} from '../services/merge';
+import { fullBackup } from '../services/core';
+import { AlertTriangle, CheckCircle2, Download, FileUp, GitMerge, Plus, RefreshCw, Trash2 } from 'lucide-react';
 
 type Resolution = 'new' | 'local';
+
+interface FileBackup {
+  name: string;
+  payload: any;
+}
 
 const TABLE_LABEL: Record<string, string> = {
   org: 'Organisasi',
@@ -30,6 +46,48 @@ const TABLE_LABEL: Record<string, string> = {
 
 function nama(t: string) {
   return TABLE_LABEL[t] || t;
+}
+
+/**
+ * Menyatukan beberapa payload backup menjadi satu payload untuk keperluan
+ * pratinjau. Record yang sama (jenis data + id) hanya dihitung sekali.
+ */
+function gabungPayload(files: FileBackup[]) {
+  const data: Record<string, any[]> = {};
+  const seen = new Set<string>();
+  let organizationId: string | undefined;
+  for (const f of files) {
+    organizationId = organizationId || f.payload?.organizationId;
+    const bagian = f.payload?.data || {};
+    for (const [t, rows] of Object.entries(bagian)) {
+      if (!Array.isArray(rows)) continue;
+      const list = (data[t] = data[t] || []);
+      for (const r of rows as any[]) {
+        const k = `${t}::${r?.id ?? JSON.stringify(r)}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        list.push(r);
+      }
+    }
+  }
+  return { packageType: 'BACKUP', version: '2.0.0', organizationId, data };
+}
+
+/** Menjumlahkan hasil penggabungan beberapa file menjadi satu ringkasan. */
+function jumlahkan(hasil: MergeResult[]): MergeResult {
+  const total: MergeResult = { added: 0, updated: 0, keptLocal: 0, skipped: 0, perTable: {} };
+  for (const r of hasil) {
+    total.added += r.added;
+    total.updated += r.updated;
+    total.keptLocal += r.keptLocal;
+    total.skipped += r.skipped;
+    for (const [t, v] of Object.entries(r.perTable)) {
+      total.perTable[t] = total.perTable[t] || { added: 0, updated: 0 };
+      total.perTable[t].added += v.added;
+      total.perTable[t].updated += v.updated;
+    }
+  }
+  return total;
 }
 
 /** Rangkum nilai kunci sebuah record penilaian untuk perbandingan. */
@@ -56,46 +114,119 @@ function ringkas(r: any): { kunci: string; nilai: string }[] {
 }
 
 export function MergePage() {
+  const [files, setFiles] = useState<FileBackup[]>([]);
   const [preview, setPreview] = useState<MergePreview | null>(null);
-  const [payload, setPayload] = useState<any>(null);
-  const [fileName, setFileName] = useState('');
   const [error, setError] = useState('');
+  const [catatan, setCatatan] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [resolution, setResolution] = useState<Record<string, Resolution>>({});
   const [defaultResolution, setDefaultResolution] = useState<'new' | 'local'>('new');
   const [result, setResult] = useState<MergeResult | null>(null);
+  const [perFile, setPerFile] = useState<{ name: string; hasil: MergeResult }[]>([]);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [backupInfo, setBackupInfo] = useState('');
 
-  async function pilihFile(f: File) {
+  /** Simpan seluruh data perangkat ini ke satu file, untuk disetor ke Ketua Pokjawas. */
+  async function simpanHasilGabungan() {
+    setBackupBusy(true);
+    setBackupInfo('');
+    try {
+      await fullBackup();
+      setBackupInfo('File backup dibuat. Kirim file PKPM_BACKUP_*.json tersebut ke Ketua Pokjawas.');
+    } catch (x: any) {
+      setBackupInfo(x?.message || 'Gagal membuat file backup.');
+    } finally {
+      setBackupBusy(false);
+    }
+  }
+
+  /** Membaca file yang dipilih pengguna (boleh beberapa sekaligus). */
+  async function pilihFile(daftar: FileList) {
     setError('');
     setResult(null);
+    setPerFile([]);
+    setPreview(null);
+    setResolution({});
     setBusy(true);
+    const masuk: FileBackup[] = [];
+    const gagal: string[] = [];
+    for (const f of Array.from(daftar)) {
+      try {
+        const obj = JSON.parse(await f.text());
+        if (obj?.packageType !== 'BACKUP') {
+          gagal.push(`${f.name}: bukan file backup lengkap`);
+          continue;
+        }
+        if (files.some(x => x.name === f.name)) {
+          gagal.push(`${f.name}: sudah ada di daftar`);
+          continue;
+        }
+        masuk.push({ name: f.name, payload: obj });
+      } catch {
+        gagal.push(`${f.name}: tidak dapat dibaca (JSON rusak)`);
+      }
+    }
+    const baru = [...files, ...masuk];
+    setFiles(baru);
+    setCatatan(gagal);
+    setBusy(false);
+    if (!baru.length) return;
+    await analisa(baru);
+  }
+
+  /** Menghitung pratinjau dari gabungan semua file yang ada di daftar. */
+  async function analisa(daftar: FileBackup[] = files) {
+    if (!daftar.length) return;
+    setBusy(true);
+    setError('');
+    setPreview(null);
+    setResolution({});
     try {
-      const { preview: p, payload: pl } = await planMerge(f);
+      const { preview: p } = await planMergePayload(gabungPayload(daftar));
       setPreview(p);
-      setPayload(pl);
-      setFileName(f.name);
-      setResolution({});
     } catch (x: any) {
       setError(x.message || 'Gagal membaca file backup');
-      setPreview(null);
-      setPayload(null);
     } finally {
       setBusy(false);
     }
   }
 
+  async function hapusFile(nama: string) {
+    const sisa = files.filter(f => f.name !== nama);
+    setFiles(sisa);
+    setResult(null);
+    setPerFile([]);
+    if (!sisa.length) {
+      setPreview(null);
+      return;
+    }
+    await analisa(sisa);
+  }
+
   async function jalankan() {
-    if (!payload) return;
+    if (!files.length) return;
     setBusy(true);
     setError('');
+    const hasil: { name: string; hasil: MergeResult }[] = [];
     try {
-      const r = await runMerge(payload, { defaultResolution, resolutions: resolution });
-      setResult(r);
+      for (let i = 0; i < files.length; i++) {
+        // Cadangan pengaman cukup sekali, di file pertama.
+        const r = await runMerge(files[i].payload, {
+          defaultResolution,
+          resolutions: resolution,
+          safetyBackup: i === 0,
+        });
+        hasil.push({ name: files[i].name, hasil: r });
+      }
+      setPerFile(hasil);
+      setResult(jumlahkan(hasil.map(h => h.hasil)));
       setPreview(null);
-      setPayload(null);
-      setFileName('');
+      setFiles([]);
+      setResolution({});
     } catch (x: any) {
       setError(x.message || 'Penggabungan gagal');
+      setPerFile(hasil);
+      if (hasil.length) setResult(jumlahkan(hasil.map(h => h.hasil)));
     } finally {
       setBusy(false);
     }
@@ -112,7 +243,25 @@ export function MergePage() {
       <PageTitle
         title="Gabungkan Data Antar Perangkat"
         desc="Satukan hasil kerja dari beberapa perangkat tanpa menghapus data lokal"
+        action={
+          <Button variant="light" disabled={backupBusy} onClick={simpanHasilGabungan}>
+            <Download size={16} className="inline" /> {backupBusy ? 'Menyiapkan…' : 'Backup Hasil Gabungan'}
+          </Button>
+        }
       />
+
+      <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3 mb-5">
+        <GitMerge size={16} className="text-[#173f70] mt-0.5 shrink-0" />
+        <p className="text-xs text-slate-700">
+          Halaman ini boleh dijalankan siapa saja yang sudah masuk, tidak harus akun admin — Ketua Pokjawas
+          dapat meminta bantuan tim penilai untuk menggabungkan. Bisa memasukkan <b>beberapa file sekaligus</b>{' '}
+          (pilih semua file backup lalu klik Buka). Setelah selesai, klik <b>Backup Hasil Gabungan</b> lalu kirim
+          file <code className="bg-white px-1 rounded">PKPM_BACKUP_*.json</code> ke Ketua Pokjawas, karena hasil
+          gabungan tersimpan di perangkat yang menjalankan.
+        </p>
+      </div>
+
+      {backupInfo && <p className="text-sm text-[#173f70] bg-slate-100 rounded-lg p-3 mb-5">{backupInfo}</p>}
 
       <Card>
         <div className="flex items-start gap-3">
@@ -121,19 +270,51 @@ export function MergePage() {
             <b>Pilih file backup perangkat lain</b>
             <p className="text-sm text-slate-500 mt-1">
               Gunakan file hasil <b>Backup Seluruh Data</b> dari perangkat lain
-              (<code className="text-xs bg-slate-100 px-1 rounded">PKPM_BACKUP_*.json</code>).
-              Data di perangkat ini <b>tidak akan dihapus</b>.
+              (<code className="text-xs bg-slate-100 px-1 rounded">PKPM_BACKUP_*.json</code>). Boleh memilih
+              beberapa file sekaligus dengan menekan Ctrl/Cmd saat memilih. Data di perangkat ini{' '}
+              <b>tidak akan dihapus</b>.
             </p>
             <input
               type="file"
               accept=".json,application/json"
+              multiple
               disabled={busy}
               className="mt-3 block text-sm"
-              onChange={e => e.target.files?.[0] && pilihFile(e.target.files[0])}
+              onChange={e => {
+                if (e.target.files?.length) pilihFile(e.target.files);
+                e.target.value = '';
+              }}
             />
-            {fileName && <p className="text-xs text-slate-500 mt-2">File: {fileName}</p>}
           </div>
         </div>
+
+        {catatan.length > 0 && (
+          <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <p className="text-xs font-bold text-amber-800 mb-1">File yang dilewati</p>
+            <ul className="text-xs text-amber-800 list-disc list-inside space-y-0.5">
+              {catatan.map((c, i) => <li key={i}>{c}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {files.length > 0 && (
+          <div className="mt-4">
+            <p className="text-xs font-bold text-slate-500 uppercase mb-2">
+              File yang akan digabung ({files.length})
+            </p>
+            <div className="divide-y border rounded-lg">
+              {files.map(f => (
+                <div key={f.name} className="flex items-center justify-between gap-3 px-3 py-2">
+                  <span className="text-sm truncate">{f.name}</span>
+                  <Button variant="danger" disabled={busy} onClick={() => hapusFile(f.name)}>
+                    <Trash2 size={14} className="inline" /> Buang
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="mt-4 flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3">
             <AlertTriangle className="text-red-600 mt-0.5 shrink-0" size={18} />
@@ -148,6 +329,7 @@ export function MergePage() {
             <div className="flex items-center gap-2 mb-4">
               <GitMerge className="text-[#173f70]" size={20} />
               <b className="text-[#173f70]">Pratinjau Penggabungan</b>
+              <span className="text-xs text-slate-500">— dihitung dari {files.length} file</span>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -285,9 +467,15 @@ export function MergePage() {
 
           <div className="flex flex-wrap gap-3 mt-5">
             <Button disabled={busy} onClick={jalankan}>
-              {busy ? 'Menggabungkan…' : `Gabungkan Sekarang${preview.conflicts.length ? ` (${preview.conflicts.length} konflik)` : ''}`}
+              {busy
+                ? 'Menggabungkan…'
+                : `Gabungkan ${files.length} File Sekarang${preview.conflicts.length ? ` (${preview.conflicts.length} konflik)` : ''}`}
             </Button>
-            <Button variant="light" disabled={busy} onClick={() => { setPreview(null); setPayload(null); setFileName(''); }}>
+            <Button
+              variant="light"
+              disabled={busy}
+              onClick={() => { setPreview(null); setFiles([]); setResolution({}); setCatatan([]); }}
+            >
               Batal
             </Button>
             <p className="text-xs text-slate-500 self-center">
@@ -321,6 +509,24 @@ export function MergePage() {
               <b className="text-2xl text-slate-700">{result.skipped}</b>
             </div>
           </div>
+
+          {perFile.length > 0 && (
+            <div className="mt-4">
+              <p className="text-xs font-bold text-slate-500 uppercase mb-2">Rincian per file</p>
+              <div className="divide-y border rounded-lg">
+                {perFile.map(f => (
+                  <div key={f.name} className="flex justify-between gap-3 px-3 py-2 text-sm">
+                    <span className="truncate">{f.name}</span>
+                    <span className="text-slate-600 whitespace-nowrap">
+                      <b className="text-blue-700">+{f.hasil.added}</b> ·{' '}
+                      <b className="text-amber-700">↻{f.hasil.updated}</b>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <details className="mt-4">
             <summary className="text-sm cursor-pointer text-[#173f70] font-bold">Rincian per jenis data</summary>
             <div className="divide-y border rounded-lg mt-2">
@@ -336,9 +542,16 @@ export function MergePage() {
                 ))}
             </div>
           </details>
-          <div className="mt-4 flex gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button disabled={backupBusy} onClick={simpanHasilGabungan}>
+              <Download size={16} className="inline" /> {backupBusy ? 'Menyiapkan…' : 'Backup Hasil Gabungan'}
+            </Button>
             <Button variant="light" onClick={() => location.reload()}>Muat ulang aplikasi</Button>
           </div>
+          <p className="text-xs text-slate-500 mt-3">
+            Kirim file <b>PKPM_BACKUP_*.json</b> hasil tombol di atas ke Ketua Pokjawas agar semua hasil
+            penilaian terkumpul di satu perangkat.
+          </p>
         </Card>
       )}
     </>

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, audit } from '../lib/db';
-import { Button, Card, PageTitle } from '../components/Layout';
+import { Button, Card, PageTitle, IconButton } from '../components/Layout';
+import { Pencil, Trash2 } from 'lucide-react';
 import type { Indicator, Period, PredikatRow, BobotKomponen } from '../types';
 import { validatePredicates } from '../services/core';
 import { BOBOT_DEFAULT, PREDIKAT_DEFAULT } from '../data/demo';
@@ -137,8 +138,8 @@ export function InstrumentAdmin() {
                 <p className="text-sm text-slate-500">{x.component} · Bobot {x.weight} · Maks. {x.maxScore} · Jenjang: {x.jenjangBerlaku?.join(', ') || 'Semua'} · {x.active ? 'Aktif' : 'Nonaktif'} · Versi: {x.versiInstrumen || 'legacy'}</p>
               </div>
               <div className="flex gap-2">
-                <Button variant="light" onClick={() => setForm({ ...x })}>Ubah</Button>
-                <Button variant="danger" onClick={() => del(x)}>Hapus</Button>
+                <IconButton title="Ubah" onClick={() => setForm({ ...x })}><Pencil size={16} /></IconButton>
+                <IconButton title="Hapus" variant="danger" onClick={() => del(x)}><Trash2 size={16} /></IconButton>
               </div>
             </div>
           </Card>
@@ -220,8 +221,8 @@ export function ConfigAdmin() {
             <div className="flex justify-between border-t py-3" key={x.id}>
               <span><b>{x.id}</b> · {x.schoolYear} · {x.status}</span>
               <span className="flex gap-1">
-                <Button variant="light" onClick={() => setPeriod({ ...x })}>Ubah</Button>
-                <Button variant="danger" onClick={() => delPeriod(x)}>Hapus</Button>
+                <IconButton title="Ubah" onClick={() => setPeriod({ ...x })}><Pencil size={16} /></IconButton>
+                <IconButton title="Hapus" variant="danger" onClick={() => delPeriod(x)}><Trash2 size={16} /></IconButton>
               </span>
             </div>
           ))}

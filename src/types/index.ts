@@ -18,7 +18,7 @@ export interface ActivationCode {id:string;code:string;label:string;orgId:string
 export interface Supervisor {id:string;name:string;nip:string;rank:string;position:string;level:string;workUnit:string;region:string;schools:number;principals:number;teachers:number;phone:string;email:string;assessorId?:string;active:boolean;skNumber?:string;skDate?:string}
 /** Aspek penilaian pada indikator (checklist keterpenuhan). */
 export interface Aspect {id:string;label:string}
-/** Dokumen yang harus ditelaah pada indikator (tanpa unggah eviden). */
+/** Dokumen yang harus ditelaah pada indikator (tanpa unggah bukti dukung). */
 export interface DocSpec {id:string;name:string}
 export interface Indicator {
  id:string;component:ComponentKey;subcomponent:string;code:string;description:string;
@@ -90,6 +90,12 @@ export interface Assessment {
  rtl?:Rtl;
  /** Catatan otomatis sudah diedit manual? */
  notesEdited?:boolean;
+ /** Centang "Ditemukan" per baris dokumen indikator: [indikatorId][nomor baris] → boolean. */
+ dokumenDitemukan?:Record<string,boolean>;
+ /** Jumlah baris dokumen yang dicentang (untuk tampilan ringkas). */
+ dokumenJumlah?:number;
+ /** Jumlah seluruh baris dokumen indikator (untuk tampilan ringkas). */
+ dokumenTotal?:number;
  /* ===== Alias field UI (dipakai halaman penilaian v2) ===== */
  documentFound:boolean;
  aspekChecklist:boolean[];

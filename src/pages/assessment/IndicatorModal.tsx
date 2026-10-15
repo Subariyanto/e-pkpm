@@ -1,45 +1,64 @@
 import { useState } from 'react';
 import { Pencil } from 'lucide-react';
 import { Button } from '../../components/Layout';
-import { CATATAN_OTOMATIS, NA_NOTE } from '../../data/demo';
+import { CATATAN_OTOMATIS, NA_NOTE, AUTO_ISI } from '../../data/demo';
 import type { Assessment, Indicator } from '../../types';
 
-const TABS = ['Kunci Skor', 'Aspek yang Dinilai', 'Dokumen yang Disiapkan', 'Penggalian Data', 'Catatan dan Temuan', 'Rencana Tindak Lanjut'];
-
-const Ta = ({ label, value, onChange, placeholder, locked }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; locked: boolean }) => (
-  <label className="text-sm block mt-3">{label}
-    <textarea disabled={locked} className="input mt-1 min-h-16" placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} />
-  </label>
-);
+const TABS = ['Kunci Skor', 'Bukti Dukung', 'Catatan dan Temuan', 'Rencana Tindak Lanjut'];
 
 export function IndicatorModal({
-  ind, form, locked, isAdmin, onClose, onUpdate, onEditIndicator,
+  ind, form, locked, isAdmin, onClose, onUpdate, onEditIndicator, buktiDukung,
 }: {
   ind: Indicator; form: Assessment; locked: boolean; isAdmin: boolean;
   onClose: () => void; onUpdate: (v: Partial<Assessment>) => void; onEditIndicator: () => void;
+  /** Daftar bukti dukung dari e-RHK (keterangan RHK) untuk indikator ini. */
+  buktiDukung?: { no: number; tw: string; nama: string }[];
 }) {
   const [tab, setTab] = useState(0);
-  const aspekTotal = ind.aspek.length || 1;
-  const aspekTerpenuhi = (form.aspekChecklist || []).filter(Boolean).length;
-  const persenAspek = Math.round((aspekTerpenuhi / aspekTotal) * 100);
-  const recommended = persenAspek >= 80 ? 2 : persenAspek >= 40 ? 1 : 0;
-
-  const setAspek = (i: number, v: boolean) => {
-    const next = [...(form.aspekChecklist || [])];
-    while (next.length < ind.aspek.length) next.push(false);
-    next[i] = v;
-    const pct = Math.round((next.filter(Boolean).length / aspekTotal) * 100);
-    onUpdate({ aspekChecklist: next, aspekPercent: pct, recommendedScore: pct >= 80 ? 2 : pct >= 40 ? 1 : 0 });
-  };
 
   const setNA = (v: boolean) => {
     onUpdate({ na: v, naReason: v ? NA_NOTE : '', notes: v ? NA_NOTE : form.notes, score: v ? undefined : form.score });
   };
 
+  /**
+   * Pilih skor sekaligus isi otomatis Catatan dan Temuan + Rencana Tindak Lanjut.
+   * Bidang yang sudah diisi manual oleh penilai tidak akan ditimpa.
+   */
   const setScore = (s: number) => {
-    const autoNote = CATATAN_OTOMATIS[s] || '';
-    const prevAuto = CATATAN_OTOMATIS[form.score ?? -1];
-    onUpdate({ score: s, notes: form.notes && form.notes !== prevAuto ? form.notes : autoNote, na: false, naReason: '' });
+    const auto = AUTO_ISI[s];
+    const base: Partial<Assessment> = {
+      score: s,
+      na: false,
+      naReason: '',
+      notes: auto?.notes || CATATAN_OTOMATIS[s] || '',
+    };
+    if (auto) {
+      const kosong = (v?: string) => !v || !v.trim();
+      if (kosong(form.notes)) base.notes = auto.notes;
+      if (kosong(form.recommendation)) base.recommendation = auto.recommendation;
+      if (kosong(form.review)) base.review = auto.review;
+      if (kosong(form.finding)) base.finding = auto.finding;
+      if (kosong(form.rtlMasalah)) base.rtlMasalah = auto.rtlMasalah;
+      if (kosong(form.rtlAkarMasalah)) base.rtlAkarMasalah = auto.rtlAkarMasalah;
+      if (kosong(form.rtlTindakan)) base.rtlTindakan = auto.rtlTindakan;
+      if (kosong(form.rtlProduk)) base.rtlProduk = auto.rtlProduk;
+      if (kosong(form.rtlBentukPKB)) base.rtlBentukPKB = auto.rtlBentukPKB;
+      if (kosong(form.rtlStatus)) base.rtlStatus = auto.rtlStatus as Assessment['rtlStatus'];
+    }
+    onUpdate(base);
+  };
+
+  /** Isi ulang seluruh Catatan dan Temuan + RTL dari skor terpilih (menimpa yang ada). */
+  const isiOtomatis = () => {
+    const s = form.score;
+    if (s === undefined) return;
+    const auto = AUTO_ISI[s];
+    if (!auto) return;
+    onUpdate({
+      notes: auto.notes, recommendation: auto.recommendation, review: auto.review, finding: auto.finding,
+      rtlMasalah: auto.rtlMasalah, rtlAkarMasalah: auto.rtlAkarMasalah, rtlTindakan: auto.rtlTindakan,
+      rtlProduk: auto.rtlProduk, rtlBentukPKB: auto.rtlBentukPKB, rtlStatus: auto.rtlStatus as Assessment['rtlStatus'],
+    });
   };
 
   return (
@@ -64,6 +83,17 @@ export function IndicatorModal({
           </label>
           {form.na && <span className="text-xs text-slate-500">{NA_NOTE}</span>}
         </div>
+
+        {!form.na && form.score !== undefined && (
+          <div className="px-4 py-2 bg-amber-50 border-b flex items-center gap-2 shrink-0 flex-wrap">
+            <span className="text-xs text-amber-800">
+              Catatan dan Temuan serta RTL terisi otomatis dari skor <b>{form.score}</b> dan masih dapat diedit.
+            </span>
+            <button onClick={isiOtomatis} className="text-xs font-semibold text-teal-700 hover:text-teal-900 underline ml-auto whitespace-nowrap">
+              Isi ulang otomatis
+            </button>
+          </div>
+        )}
 
         <div className="flex border-b overflow-x-auto shrink-0 tab-scroll">
           {TABS.map((t, i) => (
@@ -111,45 +141,65 @@ export function IndicatorModal({
             </div>
           ) : tab === 1 ? (
             <div>
-              <div className="space-y-2">
-                {ind.aspek.map((a, i) => (
-                  <label key={i} className="flex items-start gap-3 p-2 rounded hover:bg-slate-50 cursor-pointer">
-                    <input type="checkbox" disabled={locked} checked={(form.aspekChecklist || [])[i] || false} onChange={e => setAspek(i, e.target.checked)} className="w-4 h-4 mt-0.5" />
-                    <span className="text-sm">{a}</span>
-                  </label>
-                ))}
-              </div>
-              <div className="mt-4 p-3 bg-slate-50 rounded-lg grid grid-cols-2 md:grid-cols-4 gap-3 text-center text-sm">
-                <div><p className="text-xs text-slate-500">Terpenuhi</p><b className="text-emerald-600">{aspekTerpenuhi}</b></div>
-                <div><p className="text-xs text-slate-500">Tidak Terpenuhi</p><b className="text-red-500">{aspekTotal - aspekTerpenuhi}</b></div>
-                <div><p className="text-xs text-slate-500">Persentase</p><b className="text-teal-700">{persenAspek}%</b></div>
-                <div><p className="text-xs text-slate-500">Rekomendasi Skor</p><b className="text-[#173f70]">{recommended}</b></div>
-              </div>
-              {form.score !== undefined && form.score !== recommended && (
-                <label className="text-sm block mt-3">Alasan skor berbeda dari rekomendasi <span className="text-red-500">*</span>
-                  <textarea disabled={locked} className="input mt-1" value={form.review} onChange={e => onUpdate({ review: e.target.value })} placeholder="Wajib diisi jika skor berbeda dari rekomendasi aspek" />
-                </label>
+              <p className="text-xs text-slate-500 mb-3">
+                Bukti dukung yang perlu disiapkan pengawas. Penilai cukup memastikan dokumen tersedia pada bundel.
+              </p>
+
+              {/* ==== Bukti dukung dari e-RHK ==== */}
+              {buktiDukung && buktiDukung.length > 0 && (
+                <div className="mb-4 rounded-lg border-2 border-blue-200 bg-blue-50/60 p-3">
+                  <p className="text-sm font-bold text-[#173f70] mb-2">Bukti Dukung dari e-RHK</p>
+                  <ul className="space-y-2">
+                    {buktiDukung.map(b => (
+                      <li key={b.no} className="flex items-start gap-2 text-sm">
+                        <span className="font-bold text-blue-700 shrink-0">RHK-{b.no}</span>
+                        <span className="text-xs text-slate-400 shrink-0 pt-0.5">({b.tw})</span>
+                        <span className="text-slate-700">{b.nama}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
-            </div>
-          ) : tab === 2 ? (
-            <div>
-              <p className="text-xs text-slate-500 mb-3">Penilai hanya memberi tanda dokumen ditemukan atau tidak ditemukan. Tidak ada unggah eviden.</p>
+
+              {/* ==== Daftar dokumen indikator ==== */}
+              <div className="flex items-baseline justify-between gap-2 mb-2">
+                <p className="text-sm font-bold text-[#173f70]">Dokumen yang Disiapkan</p>
+                {(() => {
+                  const total = ind.documents.length;
+                  const jumlah = ind.documents.reduce((n, _d, k) => n + ((form.dokumenDitemukan || {})[`${ind.id}:${k}`] ? 1 : 0), 0);
+                  return (
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${jumlah === 0 ? 'bg-slate-100 text-slate-500' : jumlah === total ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {jumlah} dari {total} ditemukan
+                    </span>
+                  );
+                })()}
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead><tr className="bg-slate-100"><th className="p-2 text-left">Nama Dokumen</th><th className="p-2 text-center">Ditemukan</th><th className="p-2 text-left">Nomor</th><th className="p-2 text-left">Tanggal</th><th className="p-2 text-left">Keterangan</th></tr></thead>
+                  <thead><tr className="bg-slate-100"><th className="p-2 text-left w-10">No</th><th className="p-2 text-left">Nama Dokumen</th><th className="p-2 text-center w-28">Ditemukan</th></tr></thead>
                   <tbody>
                     {ind.documents.map((doc, i) => {
-                      const isMain = i === 0;
+                      const key = `${ind.id}:${i}`;
+                      const checked = !!form.dokumenDitemukan?.[key];
                       return (
                         <tr key={i} className="border-b">
-                          <td className="p-2 whitespace-nowrap">{doc}</td>
+                          <td className="p-2 text-slate-400">{i + 1}.</td>
+                          <td className="p-2">{doc}</td>
                           <td className="p-2 text-center">
-                            <input type="checkbox" disabled={locked} checked={isMain ? form.documentFound : false}
-                              onChange={e => isMain && onUpdate({ documentFound: e.target.checked, documentName: doc })} className="w-4 h-4" />
+                            <input type="checkbox" disabled={locked} checked={checked}
+                              onChange={e => {
+                                const map = { ...(form.dokumenDitemukan || {}), [key]: e.target.checked };
+                                const jumlah = ind.documents.reduce((n, _d, k) => n + (map[`${ind.id}:${k}`] ? 1 : 0), 0);
+                                const utama = !!map[`${ind.id}:0`] ? form.documentName || ind.documents[0] : '';
+                                onUpdate({
+                                  dokumenDitemukan: map,
+                                  dokumenJumlah: jumlah,
+                                  dokumenTotal: ind.documents.length,
+                                  documentFound: jumlah > 0,
+                                  documentName: utama,
+                                });
+                              }} className="w-4 h-4" />
                           </td>
-                          <td className="p-2"><input disabled={locked || !isMain} className="input !py-1 text-xs" value={isMain ? form.documentNumber : ''} onChange={e => onUpdate({ documentNumber: e.target.value })} /></td>
-                          <td className="p-2"><input type="date" disabled={locked || !isMain} className="input !py-1 text-xs" value={isMain ? form.documentDate : ''} onChange={e => onUpdate({ documentDate: e.target.value })} /></td>
-                          <td className="p-2"><input disabled={locked || !isMain} className="input !py-1 text-xs" value={isMain ? form.documentStatus : ''} onChange={e => onUpdate({ documentStatus: e.target.value })} placeholder="Keterangan" /></td>
                         </tr>
                       );
                     })}
@@ -157,28 +207,35 @@ export function IndicatorModal({
                 </table>
               </div>
             </div>
-          ) : tab === 3 ? (
-            <div>
-              <Ta locked={locked} label="Telaah Dokumen" value={form.telaahDokumen} onChange={v => onUpdate({ telaahDokumen: v })} placeholder="Hasil telaah dokumen..." />
-              <Ta locked={locked} label="Wawancara / Klarifikasi" value={form.wawancara} onChange={v => onUpdate({ wawancara: v })} placeholder="Hasil wawancara atau klarifikasi..." />
-              <Ta locked={locked} label="Konfirmasi kepada Madrasah Binaan" value={form.konfirmasi} onChange={v => onUpdate({ konfirmasi: v })} placeholder="Konfirmasi bila diperlukan..." />
-              <Ta locked={locked} label="Pemeriksaan Konsistensi (Program–Pelaksanaan–Hasil–RTL)" value={form.konsistensi} onChange={v => onUpdate({ konsistensi: v })} placeholder="Konsistensi antara program, pelaksanaan, hasil, dan RTL..." />
-              <Ta locked={locked} label="Hasil Penggalian / Temuan" value={form.finding} onChange={v => onUpdate({ finding: v })} placeholder="Temuan utama..." />
-            </div>
-          ) : tab === 4 ? (
+          ) : tab === 2 ? (
             <div>
               <label className="text-sm block">Catatan Penilai <span className="text-xs text-slate-500">(terisi otomatis saat memilih skor, dapat diedit)</span>
                 <textarea disabled={locked} className="input mt-1 min-h-20" value={form.notes} onChange={e => onUpdate({ notes: e.target.value })} />
               </label>
-              <Ta locked={locked} label="Kekuatan" value={form.recommendation} onChange={v => onUpdate({ recommendation: v })} placeholder="Kekuatan yang ditemukan..." />
-              <Ta locked={locked} label="Kekurangan / Ketidaksesuaian / Hasil Klarifikasi" value={form.review} onChange={v => onUpdate({ review: v })} placeholder="Kekurangan, ketidaksesuaian, atau hasil klarifikasi..." />
+              <label className="text-sm block mt-3">Kekuatan
+                <textarea disabled={locked} className="input mt-1 min-h-16" value={form.recommendation} onChange={e => onUpdate({ recommendation: e.target.value })} placeholder="Kekuatan yang ditemukan..." />
+              </label>
+              <label className="text-sm block mt-3">Kekurangan / Ketidaksesuaian / Hasil Klarifikasi
+                <textarea disabled={locked} className="input mt-1 min-h-16" value={form.review} onChange={e => onUpdate({ review: e.target.value })} placeholder="Kekurangan, ketidaksesuaian, atau hasil klarifikasi..." />
+              </label>
+              <label className="text-sm block mt-3">Hasil Penggalian / Temuan
+                <textarea disabled={locked} className="input mt-1 min-h-16" value={form.finding} onChange={e => onUpdate({ finding: e.target.value })} placeholder="Temuan utama..." />
+              </label>
             </div>
           ) : (
             <div className="grid md:grid-cols-2 gap-3">
-              <Ta locked={locked} label="Masalah / Kesenjangan" value={form.rtlMasalah} onChange={v => onUpdate({ rtlMasalah: v })} />
-              <Ta locked={locked} label="Akar Masalah" value={form.rtlAkarMasalah} onChange={v => onUpdate({ rtlAkarMasalah: v })} />
-              <Ta locked={locked} label="Tindakan Perbaikan" value={form.rtlTindakan} onChange={v => onUpdate({ rtlTindakan: v })} />
-              <Ta locked={locked} label="Produk yang Harus Dihasilkan" value={form.rtlProduk} onChange={v => onUpdate({ rtlProduk: v })} />
+              <label className="text-sm block">Masalah / Kesenjangan
+                <textarea disabled={locked} className="input mt-1 min-h-16" value={form.rtlMasalah} onChange={e => onUpdate({ rtlMasalah: e.target.value })} />
+              </label>
+              <label className="text-sm block">Akar Masalah
+                <textarea disabled={locked} className="input mt-1 min-h-16" value={form.rtlAkarMasalah} onChange={e => onUpdate({ rtlAkarMasalah: e.target.value })} />
+              </label>
+              <label className="text-sm block">Tindakan Perbaikan
+                <textarea disabled={locked} className="input mt-1 min-h-16" value={form.rtlTindakan} onChange={e => onUpdate({ rtlTindakan: e.target.value })} />
+              </label>
+              <label className="text-sm block">Produk yang Harus Dihasilkan
+                <textarea disabled={locked} className="input mt-1 min-h-16" value={form.rtlProduk} onChange={e => onUpdate({ rtlProduk: e.target.value })} />
+              </label>
               <label className="text-sm block">Bentuk PKB
                 <select disabled={locked} className="input mt-1" value={form.rtlBentukPKB} onChange={e => onUpdate({ rtlBentukPKB: e.target.value })}>
                   <option value="">Pilih bentuk PKB</option>
@@ -206,12 +263,9 @@ export function IndicatorModal({
 
         <div className="p-4 border-t shrink-0 bg-slate-50 rounded-b-xl">
           <div className="flex justify-between items-center flex-wrap gap-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${form.na ? 'bg-slate-200 text-slate-600' : form.score !== undefined ? 'bg-teal-100 text-teal-800' : 'bg-amber-100 text-amber-800'}`}>
-                {form.na ? 'N/A — tidak dinilai' : form.score !== undefined ? `Skor: ${form.score}/2` : 'Belum diberi skor'}
-              </span>
-              <span className="text-xs text-slate-400 hidden sm:inline">Perubahan tersimpan otomatis saat berpindah indikator</span>
-            </div>
+            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${form.na ? 'bg-slate-200 text-slate-600' : form.score !== undefined ? 'bg-teal-100 text-teal-800' : 'bg-amber-100 text-amber-800'}`}>
+              {form.na ? 'N/A — tidak dinilai' : form.score !== undefined ? `Skor: ${form.score}/2` : 'Belum diberi skor'}
+            </span>
             <div className="flex gap-2 ml-auto">
               {tab > 0 && <Button variant="light" onClick={() => setTab(tab - 1)}>Sebelumnya</Button>}
               {tab < TABS.length - 1
@@ -219,7 +273,6 @@ export function IndicatorModal({
                 : <Button onClick={onClose}>Selesai</Button>}
             </div>
           </div>
-          <p className="text-[10px] text-slate-400 mt-2 sm:hidden">Perubahan tersimpan otomatis saat berpindah indikator</p>
         </div>
       </div>
     </div>

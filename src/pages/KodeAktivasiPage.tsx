@@ -36,8 +36,15 @@ function tanggal(iso?: string | null): string {
 }
 
 export function KodeAktivasiPage() {
-  const [adminKey, setAdminKey] = useState(() => localStorage.getItem(KEY_STORE) || '');
-  const [keyOk, setKeyOk] = useState(false);
+  // Seperti PKG & PKKM: sekali login admin, semua fitur langsung terbuka.
+  // Kunci admin diwarisi dari sesi login (sessionStorage) atau dari perangkat
+  // (localStorage), sehingga menu ini tidak menanyakan password lagi.
+  const [adminKey, setAdminKey] = useState(
+    () => localStorage.getItem(KEY_STORE) || sessionStorage.getItem('pkpm_admin_key') || '',
+  );
+  const [keyOk, setKeyOk] = useState(
+    () => !!(localStorage.getItem(KEY_STORE) || sessionStorage.getItem('pkpm_admin_key')),
+  );
   const [kode, setKode] = useState<KodeLisensi[]>([]);
   const [stat, setStat] = useState<any>(null);
   const [busy, setBusy] = useState(false);
@@ -126,7 +133,9 @@ export function KodeAktivasiPage() {
     a.click();
   }
 
-  if (!keyOk) {
+  // Pintu darurat: hanya muncul kalau admin membuka menu ini dari sesi yang
+  // tidak punya kunci admin sama sekali (mis. login pengguna biasa).
+  if (!keyOk && !adminKey) {
     return <PintuAdmin onMasuk={k => simpanKey(k)} busy={busy} setBusy={setBusy} err={err} setErr={setErr} />;
   }
 
