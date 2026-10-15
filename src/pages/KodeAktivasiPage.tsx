@@ -9,6 +9,7 @@ import {
   adminDeleteCode,
   adminGetStats,
   verifyAdminKey,
+  adminLogin,
   pesanAlasan,
   type KodeLisensi,
 } from '../services/pusatLisensi';
@@ -126,39 +127,7 @@ export function KodeAktivasiPage() {
   }
 
   if (!keyOk) {
-    return (
-      <div className="max-w-lg mx-auto mt-10">
-        <div className="card p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <KeyRound className="text-[#173f70]" size={22} />
-            <h2 className="text-xl font-bold text-[#173f70]">Admin Key Pusat Lisensi</h2>
-          </div>
-          <p className="text-sm text-slate-600 mb-4">
-            Masukkan Admin Key Pusat Lisensi untuk mengelola kode aktivasi e-PKPM.
-            Key disimpan di perangkat ini saja dan tidak ikut terkirim ke mana pun selain server lisensi.
-          </p>
-          <input
-            type="password"
-            className="input mb-3"
-            placeholder="Admin Key"
-            defaultValue={adminKey}
-            onBlur={e => simpanKey(e.target.value.trim())}
-            onKeyDown={e => { if (e.key === 'Enter') simpanKey((e.target as HTMLInputElement).value.trim()); }}
-          />
-          {err && <p className="text-red-600 text-sm mb-3">{err}</p>}
-          <button
-            className="btn-primary w-full"
-            disabled={busy}
-            onClick={() => {
-              const el = document.querySelector<HTMLInputElement>('input[type=password]');
-              simpanKey((el?.value || '').trim());
-            }}
-          >
-            {busy ? 'Memeriksa…' : 'Masuk Panel Kode'}
-          </button>
-        </div>
-      </div>
-    );
+    return <PintuAdmin onMasuk={k => simpanKey(k)} busy={busy} setBusy={setBusy} err={err} setErr={setErr} />;
   }
 
   const aktif = kode.filter(k => k.is_active).length;
@@ -334,6 +303,108 @@ export function KodeAktivasiPage() {
               </tbody>
             </table>
           </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Pintu masuk panel admin. Dua cara:
+ *  1. Login username + password (disarankan) — server mengembalikan Admin Key.
+ *  2. Tempel Admin Key langsung (cadangan bila password admin belum diatur).
+ */
+function PintuAdmin({
+  onMasuk, busy, setBusy, err, setErr,
+}: {
+  onMasuk: (key: string) => void;
+  busy: boolean;
+  setBusy: (v: boolean) => void;
+  err: string;
+  setErr: (v: string) => void;
+}) {
+  const [cara, setCara] = useState<'login' | 'key'>('login');
+  const [username, setUsername] = useState('admin');
+  const [password, setPassword] = useState('');
+  const [keyManual, setKeyManual] = useState('');
+
+  async function login() {
+    setBusy(true); setErr('');
+    try {
+      const r = await adminLogin(username.trim(), password);
+      if (!r.success || !r.admin_key) {
+        setErr(pesanAlasan(r.reason));
+        return;
+      }
+      onMasuk(r.admin_key);
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="max-w-lg mx-auto mt-10">
+      <div className="card p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <KeyRound className="text-[#173f70]" size={22} />
+          <h2 className="text-xl font-bold text-[#173f70]">Panel Admin — Kode Aktivasi</h2>
+        </div>
+
+        <div className="flex gap-2 mb-5 bg-slate-100 p-1 rounded-lg">
+          <button
+            className={`flex-1 py-2 rounded-md text-sm font-bold ${cara === 'login' ? 'bg-white text-[#173f70] shadow' : 'text-slate-500'}`}
+            onClick={() => { setCara('login'); setErr(''); }}
+          >
+            Username & Password
+          </button>
+          <button
+            className={`flex-1 py-2 rounded-md text-sm font-bold ${cara === 'key' ? 'bg-white text-[#173f70] shadow' : 'text-slate-500'}`}
+            onClick={() => { setCara('key'); setErr(''); }}
+          >
+            Admin Key
+          </button>
+        </div>
+
+        {cara === 'login' ? (
+          <form onSubmit={e => { e.preventDefault(); login(); }}>
+            <label>Username admin</label>
+            <input
+              className="input mb-4"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              autoComplete="username"
+            />
+            <label>Password</label>
+            <input
+              type="password"
+              className="input mb-4"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              autoComplete="current-password"
+              placeholder="password admin"
+            />
+            {err && <p className="text-red-600 text-sm mb-4 bg-red-50 border border-red-200 rounded-lg p-3">{err}</p>}
+            <button className="btn-primary w-full" disabled={busy}>
+              {busy ? 'Memeriksa…' : 'Masuk'}
+            </button>
+            <p className="text-xs text-slate-500 mt-4">
+              Password diverifikasi di server Pusat Lisensi. Admin Key tidak perlu dihafal —
+              server mengirimkannya otomatis setelah login berhasil.
+            </p>
+          </form>
+        ) : (
+          <form onSubmit={e => { e.preventDefault(); onMasuk(keyManual.trim()); }}>
+            <label>Admin Key Pusat Lisensi</label>
+            <input
+              type="password"
+              className="input mb-4"
+              value={keyManual}
+              onChange={e => setKeyManual(e.target.value)}
+              placeholder="PJWS-ADM-…"
+            />
+            {err && <p className="text-red-600 text-sm mb-4 bg-red-50 border border-red-200 rounded-lg p-3">{err}</p>}
+            <button className="btn-primary w-full" disabled={busy || !keyManual.trim()}>
+              {busy ? 'Memeriksa…' : 'Masuk dengan Key'}
+            </button>
+          </form>
         )}
       </div>
     </div>

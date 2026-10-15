@@ -301,6 +301,63 @@ export async function adminDeleteCode(adminKey: string, code: string): Promise<a
   }
 }
 
+// ============================================================
+// LOGIN ADMIN (username + password, bukan Admin Key)
+// ============================================================
+
+/**
+ * Login admin lewat username + password. Server memverifikasi lalu
+ * mengembalikan Admin Key yang dipakai untuk operasi admin berikutnya.
+ *
+ * Bentuk password yang di-hash: `admin:<password>` — mengikuti pola
+ * yang sudah dipakai aplikasi lain di Pusat Lisensi.
+ */
+export async function adminLogin(
+  username: string,
+  password: string,
+): Promise<{ success: boolean; reason: string; admin_key?: string; username?: string; fullname?: string }> {
+  try {
+    const password_hash = await sha256(`admin:${password}`);
+    return await callRpc('admin_login', {
+      p_app_slug: APP_SLUG,
+      p_username: username,
+      p_password_hash: password_hash,
+    });
+  } catch {
+    return { success: false, reason: 'network_error' };
+  }
+}
+
+/**
+ * Ubah password admin. Bisa dipakai memakai Admin Key (jalur lama) ATAU
+ * password admin saat ini (jalur baru, agar admin tidak perlu tahu key).
+ */
+export async function adminChangePassword(opts: {
+  adminKey?: string;
+  passwordLama?: string;
+  passwordBaru: string;
+  username?: string;
+}): Promise<any> {
+  const password_hash = await sha256(`admin:${opts.passwordBaru}`);
+  try {
+    if (opts.adminKey) {
+      return await callRpc('admin_change_password', {
+        p_admin_key: opts.adminKey,
+        p_app_slug: APP_SLUG,
+        p_new_password_hash: password_hash,
+      });
+    }
+    return await callRpc('admin_change_password_self', {
+      p_app_slug: APP_SLUG,
+      p_username: opts.username || 'admin',
+      p_password_hash: await sha256(`admin:${opts.passwordLama || ''}`),
+      p_new_password_hash: password_hash,
+    });
+  } catch {
+    return { success: false, reason: 'network_error' };
+  }
+}
+
 /** Uji Admin Key tanpa efek samping. */
 export async function verifyAdminKey(adminKey: string): Promise<boolean> {
   try {
