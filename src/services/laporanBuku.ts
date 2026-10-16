@@ -641,11 +641,13 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
   // paragraf: kolom kiri mulai di margin kiri (M) dan kolom kanan berakhir
   // di margin kanan (M + LEBAR). Nama dan NIP disejajarkan kanan di dalam
   // masing-masing kolom supaya rapi.
-  const LEBAR_TTD = 66;
+  const LEBAR_TTD = 70;
   const xKiri = M;
   const xKanan = M + LEBAR - LEBAR_TTD;
+  /** Titik tengah kolom tanda tangan; teks ditulis rata tengah di titik ini. */
+  const tengahTtd = (x: number) => x + LEBAR_TTD / 2;
   doc.setFontSize(11);
-  doc.text(`${kota}, ${hariIni}`, xKanan + LEBAR_TTD, y, { align: 'right' });
+  doc.text(`${kota}, ${hariIni}`, tengahTtd(xKanan), y, { align: 'center' });
   y += 3.6;
 
   const kolomTtd = [
@@ -656,19 +658,19 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     let yk = y;
-    doc.text(k.label, k.x + LEBAR_TTD, yk, { align: 'right' });
+    doc.text(k.label, tengahTtd(k.x), yk, { align: 'center' });
     yk += 3.6;
     if (k.jabatan) {
       const jw = doc.splitTextToSize(k.jabatan, LEBAR_TTD);
-      doc.text(jw, k.x + LEBAR_TTD, yk, { align: 'right' });
+      doc.text(jw, tengahTtd(k.x), yk, { align: 'center' });
       yk += jw.length * 3.6;
     }
     yk += 18;
     doc.setFont('helvetica', 'bold');
-    doc.text(doc.splitTextToSize(k.nama, LEBAR_TTD), k.x + LEBAR_TTD, yk, { align: 'right' });
+    doc.text(doc.splitTextToSize(k.nama, LEBAR_TTD), tengahTtd(k.x), yk, { align: 'center' });
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
-    doc.text(`NIP. ${k.nip}`, k.x + LEBAR_TTD, yk + 3.6, { align: 'right' });
+    doc.text(`NIP. ${k.nip}`, tengahTtd(k.x), yk + 3.6, { align: 'center' });
   }
 
   // ===== 3. KATA PENGANTAR ==================================================
@@ -706,14 +708,14 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
     M, y, LEBAR,
   );
   y += 14;
-  doc.text(`${kota}, ${hariIni}`, xKanan + LEBAR_TTD, y, { align: 'right' });
+  doc.text(`${kota}, ${hariIni}`, tengahTtd(xKanan), y, { align: 'center' });
   y += 3.6;
   doc.setFont('helvetica', 'bold');
-  doc.text('Ketua Pokjawas Madrasah,', xKanan + LEBAR_TTD, y, { align: 'right' });
+  doc.text('Ketua Pokjawas Madrasah,', tengahTtd(xKanan), y, { align: 'center' });
   doc.setFont('helvetica', 'normal');
-  doc.text(doc.splitTextToSize(namaKetua, LEBAR_TTD), xKanan + LEBAR_TTD, y + 18, { align: 'right' });
+  doc.text(doc.splitTextToSize(namaKetua, LEBAR_TTD), tengahTtd(xKanan), y + 18, { align: 'center' });
   doc.setFontSize(8);
-  doc.text(`NIP. ${nipKetua}`, xKanan + LEBAR_TTD, y + 21.6, { align: 'right' });
+  doc.text(`NIP. ${nipKetua}`, tengahTtd(xKanan), y + 21.6, { align: 'center' });
 
   // ===== 4. DAFTAR ISI (halaman tersendiri, ditulis pada lintasan kedua) ===
   // Halaman ini WAJIB ditambahkan sekarang supaya Bab I tidak menimpa daftar
@@ -757,7 +759,12 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
             pertama = false;
           }
           doc.setFontSize(11);
-          doc.text(pertama ? `-  ${baris}` : `    ${baris}`, M, yy);
+          if (pertama) {
+            doc.text(`-  ${baris}`, M, yy);
+          } else {
+            // Baris lanjutan butir: rata kiri-kanan pada lebar teks butir
+            doc.text(baris, M + 4, yy, { align: 'justify', maxWidth: LEBAR - 6 });
+          }
           pertama = false;
           yy += 6.5;
         }
@@ -765,7 +772,7 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
         continue;
       }
       yy = tulisParagraf(doc, el.teks, M, yy, LEBAR);
-      yy += 4;
+      yy += 4.5;
     }
     return lanjutDariPoin(yy);
   };
@@ -1001,14 +1008,18 @@ function tulisTabelPrioritas(
 function tulisParagraf(doc: jsPDF, teks: string, x: number, y0: number, lebar: number, tinggiBaris = 6.5): number {
   let y = y0;
   // Rata kiri-kanan (justify) dengan spasi 1,5 (tinggi baris ±6,5 mm pada
-  // font 11pt). Baris terakhir paragraf tidak direntangkan oleh jsPDF.
-  const wrap = doc.splitTextToSize(bersih(teks), lebar);
-  for (const baris of wrap) {
+  // font 11pt). jsPDF hanya merentangkan baris yang masih punya ruang sisa,
+  // jadi baris terakhir paragraf otomatis tidak direntangkan.
+  const kalimat = String(bersih(teks));
+  const wrap = doc.splitTextToSize(kalimat, lebar);
+  for (let i = 0; i < wrap.length; i += 1) {
     if (y > 272) {
       doc.addPage();
       y = 24;
     }
-    doc.text(baris, x, y, { align: 'justify', maxWidth: lebar });
+    // Baris terakhir tidak dijustify supaya tidak ada celah menganga.
+    const terakhir = i === wrap.length - 1;
+    doc.text(wrap[i], x, y, terakhir ? undefined : { align: 'justify', maxWidth: lebar });
     y += tinggiBaris;
   }
   return y;
