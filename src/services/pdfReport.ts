@@ -184,7 +184,11 @@ function renderIndividual(
   }
 
   // Dasar Hukum
-  const regulasiUtama = regulasi.filter(r => r.status === 'berlaku').slice(0, 3);
+  // Ditulis lengkap mengikuti menu Regulasi: nomor/judul lengkap, tahun,
+  // beserta statusnya; yang sudah dicabut tidak ditampilkan.
+  const regulasiUtama = regulasi
+    .filter(r => r.status !== 'dicabut')
+    .sort((a, b) => (a.urutan ?? a.order ?? 99) - (b.urutan ?? b.order ?? 99));
   if (regulasiUtama.length) {
     y += 3;
     doc.setFont('helvetica', 'bold');
@@ -198,9 +202,13 @@ function renderIndividual(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     for (const r of regulasiUtama) {
-      const wrap = doc.splitTextToSize(`${bersih(r.nomor || r.number)} tentang ${bersih(r.tentang || r.title)}`, innerW);
+      const nomor = bersih(r.nomor || r.number);
+      const judul = bersih(r.judul || r.tentang || r.title);
+      const tahun = r.tahun ? ` (${bersih(r.tahun)})` : '';
+      const teks = `${nomor} tentang ${judul}${tahun}`.replace(/\s+/g, ' ').trim();
+      const wrap = doc.splitTextToSize(teks, innerW - 4);
       doc.text(wrap, margin, y);
-      y += wrap.length * 4.2 + 1;
+      y += wrap.length * 4.2 + 1.2;
     }
   }
   y += 5;
