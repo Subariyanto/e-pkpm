@@ -4,7 +4,7 @@ import { Button } from '../../components/Layout';
 import { CATATAN_OTOMATIS, NA_NOTE, AUTO_ISI } from '../../data/demo';
 import type { Assessment, Indicator } from '../../types';
 
-const TABS = ['Kunci Skor', 'Bukti Dukung', 'Catatan dan Temuan', 'Rencana Tindak Lanjut'];
+const TABS = ['Kunci Skor', 'Bukti Dukung'];
 
 export function IndicatorModal({
   ind, form, locked, isAdmin, onClose, onUpdate, onEditIndicator, buktiDukung,
@@ -20,44 +20,14 @@ export function IndicatorModal({
     onUpdate({ na: v, naReason: v ? NA_NOTE : '', notes: v ? NA_NOTE : form.notes, score: v ? undefined : form.score });
   };
 
-  /**
-   * Pilih skor sekaligus isi otomatis Catatan dan Temuan + Rencana Tindak Lanjut.
-   * Bidang yang sudah diisi manual oleh penilai tidak akan ditimpa.
-   */
+  /** Pilih skor sekaligus isi otomatis catatan (ringkas) dari skor terpilih. */
   const setScore = (s: number) => {
     const auto = AUTO_ISI[s];
-    const base: Partial<Assessment> = {
+    onUpdate({
       score: s,
       na: false,
       naReason: '',
       notes: auto?.notes || CATATAN_OTOMATIS[s] || '',
-    };
-    if (auto) {
-      const kosong = (v?: string) => !v || !v.trim();
-      if (kosong(form.notes)) base.notes = auto.notes;
-      if (kosong(form.recommendation)) base.recommendation = auto.recommendation;
-      if (kosong(form.review)) base.review = auto.review;
-      if (kosong(form.finding)) base.finding = auto.finding;
-      if (kosong(form.rtlMasalah)) base.rtlMasalah = auto.rtlMasalah;
-      if (kosong(form.rtlAkarMasalah)) base.rtlAkarMasalah = auto.rtlAkarMasalah;
-      if (kosong(form.rtlTindakan)) base.rtlTindakan = auto.rtlTindakan;
-      if (kosong(form.rtlProduk)) base.rtlProduk = auto.rtlProduk;
-      if (kosong(form.rtlBentukPKB)) base.rtlBentukPKB = auto.rtlBentukPKB;
-      if (kosong(form.rtlStatus)) base.rtlStatus = auto.rtlStatus as Assessment['rtlStatus'];
-    }
-    onUpdate(base);
-  };
-
-  /** Isi ulang seluruh Catatan dan Temuan + RTL dari skor terpilih (menimpa yang ada). */
-  const isiOtomatis = () => {
-    const s = form.score;
-    if (s === undefined) return;
-    const auto = AUTO_ISI[s];
-    if (!auto) return;
-    onUpdate({
-      notes: auto.notes, recommendation: auto.recommendation, review: auto.review, finding: auto.finding,
-      rtlMasalah: auto.rtlMasalah, rtlAkarMasalah: auto.rtlAkarMasalah, rtlTindakan: auto.rtlTindakan,
-      rtlProduk: auto.rtlProduk, rtlBentukPKB: auto.rtlBentukPKB, rtlStatus: auto.rtlStatus as Assessment['rtlStatus'],
     });
   };
 
@@ -84,14 +54,12 @@ export function IndicatorModal({
           {form.na && <span className="text-xs text-slate-500">{NA_NOTE}</span>}
         </div>
 
-        {!form.na && form.score !== undefined && (
-          <div className="px-4 py-2 bg-amber-50 border-b flex items-center gap-2 shrink-0 flex-wrap">
-            <span className="text-xs text-amber-800">
-              Catatan dan Temuan serta RTL terisi otomatis dari skor <b>{form.score}</b> dan masih dapat diedit.
+        {!form.na && (
+          <div className="px-4 py-2 bg-slate-50 border-b flex items-center gap-2 shrink-0 flex-wrap">
+            <span className="text-xs text-slate-600">
+              Catatan Hasil Penilaian dan Rencana Tindak Lanjut dihitung otomatis dari skor seluruh komponen
+              dan disajikan pada halaman <b>Cetak Instrumen</b>.
             </span>
-            <button onClick={isiOtomatis} className="text-xs font-semibold text-teal-700 hover:text-teal-900 underline ml-auto whitespace-nowrap">
-              Isi ulang otomatis
-            </button>
           </div>
         )}
 
@@ -138,8 +106,11 @@ export function IndicatorModal({
                   ))}
                 </div>
               </div>
+              <label className="text-sm block mt-4">Catatan <span className="text-xs text-slate-500">(opsional, terisi otomatis dari skor)</span>
+                <textarea disabled={locked} className="input mt-1 min-h-20" value={form.notes} onChange={e => onUpdate({ notes: e.target.value })} />
+              </label>
             </div>
-          ) : tab === 1 ? (
+          ) : (
             <div>
               <p className="text-xs text-slate-500 mb-3">
                 Bukti dukung yang perlu disiapkan pengawas. Penilai cukup memastikan dokumen tersedia pada bundel.
@@ -206,57 +177,6 @@ export function IndicatorModal({
                   </tbody>
                 </table>
               </div>
-            </div>
-          ) : tab === 2 ? (
-            <div>
-              <label className="text-sm block">Catatan Penilai <span className="text-xs text-slate-500">(terisi otomatis saat memilih skor, dapat diedit)</span>
-                <textarea disabled={locked} className="input mt-1 min-h-20" value={form.notes} onChange={e => onUpdate({ notes: e.target.value })} />
-              </label>
-              <label className="text-sm block mt-3">Kekuatan
-                <textarea disabled={locked} className="input mt-1 min-h-16" value={form.recommendation} onChange={e => onUpdate({ recommendation: e.target.value })} placeholder="Kekuatan yang ditemukan..." />
-              </label>
-              <label className="text-sm block mt-3">Kekurangan / Ketidaksesuaian / Hasil Klarifikasi
-                <textarea disabled={locked} className="input mt-1 min-h-16" value={form.review} onChange={e => onUpdate({ review: e.target.value })} placeholder="Kekurangan, ketidaksesuaian, atau hasil klarifikasi..." />
-              </label>
-              <label className="text-sm block mt-3">Hasil Penggalian / Temuan
-                <textarea disabled={locked} className="input mt-1 min-h-16" value={form.finding} onChange={e => onUpdate({ finding: e.target.value })} placeholder="Temuan utama..." />
-              </label>
-            </div>
-          ) : (
-            <div className="grid md:grid-cols-2 gap-3">
-              <label className="text-sm block">Masalah / Kesenjangan
-                <textarea disabled={locked} className="input mt-1 min-h-16" value={form.rtlMasalah} onChange={e => onUpdate({ rtlMasalah: e.target.value })} />
-              </label>
-              <label className="text-sm block">Akar Masalah
-                <textarea disabled={locked} className="input mt-1 min-h-16" value={form.rtlAkarMasalah} onChange={e => onUpdate({ rtlAkarMasalah: e.target.value })} />
-              </label>
-              <label className="text-sm block">Tindakan Perbaikan
-                <textarea disabled={locked} className="input mt-1 min-h-16" value={form.rtlTindakan} onChange={e => onUpdate({ rtlTindakan: e.target.value })} />
-              </label>
-              <label className="text-sm block">Produk yang Harus Dihasilkan
-                <textarea disabled={locked} className="input mt-1 min-h-16" value={form.rtlProduk} onChange={e => onUpdate({ rtlProduk: e.target.value })} />
-              </label>
-              <label className="text-sm block">Bentuk PKB
-                <select disabled={locked} className="input mt-1" value={form.rtlBentukPKB} onChange={e => onUpdate({ rtlBentukPKB: e.target.value })}>
-                  <option value="">Pilih bentuk PKB</option>
-                  {['Diklat', 'Workshop', 'Lokakarya', 'Seminar', 'KKG/MGMP', 'Mentoring/Coaching', 'Penelitian Tindakan', 'Publikasi Ilmiah', 'Lainnya'].map(x => <option key={x}>{x}</option>)}
-                </select>
-              </label>
-              <label className="text-sm block">Target Waktu
-                <input disabled={locked} className="input mt-1" value={form.rtlTarget} onChange={e => onUpdate({ rtlTarget: e.target.value })} placeholder="Contoh: Semester Ganjil 2026/2027" />
-              </label>
-              <label className="text-sm block">Penanggung Jawab
-                <input disabled={locked} className="input mt-1" value={form.rtlPIC} onChange={e => onUpdate({ rtlPIC: e.target.value })} />
-              </label>
-              <label className="text-sm block">Bukti Penyelesaian
-                <input disabled={locked} className="input mt-1" value={form.rtlBukti} onChange={e => onUpdate({ rtlBukti: e.target.value })} />
-              </label>
-              <label className="text-sm block">Status RTL
-                <select disabled={locked} className="input mt-1" value={form.rtlStatus} onChange={e => onUpdate({ rtlStatus: e.target.value as Assessment['rtlStatus'] })}>
-                  <option value="">Pilih status</option>
-                  {['Belum dimulai', 'Berjalan', 'Selesai', 'Terverifikasi'].map(x => <option key={x}>{x}</option>)}
-                </select>
-              </label>
             </div>
           )}
         </div>

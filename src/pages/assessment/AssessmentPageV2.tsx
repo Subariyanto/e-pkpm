@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, audit } from '../../lib/db';
-import { Button, Card, PageTitle } from '../../components/Layout';
+import { Button, Card, PageTitle, TABLE_CELL } from '../../components/Layout';
 import { saveResult, validateFinalization, indicatorsForJenjang, calculate, instrumenAktif } from '../../services/core';
 import { CATATAN_OTOMATIS, NA_NOTE } from '../../data/demo';
 import { STEPS, COMP_KEYS, emptyAssessment } from './helpers';
@@ -9,6 +9,7 @@ import { ProgressSteps } from './ProgressSteps';
 import { IndicatorList } from './IndicatorList';
 import { RHK_MAP } from '../../data/instruments-v2';
 import { IndicatorModal } from './IndicatorModal';
+import { catatanHasil, rekapRTL } from './ringkasan';
 import type { Assessment, Indicator } from '../../types';
 import { Search, ChevronRight, ChevronLeft, Save, CheckCircle2 } from 'lucide-react';
 
@@ -34,7 +35,9 @@ export function AssessmentPageV2() {
     () => indicatorsForJenjang(instrumenAktif(allIns), jenjang),
     [allIns, jenjang],
   );
-  const stepIns = step >= 1 ? ins.filter(i => i.component === COMP_KEYS[step - 1]) : [];
+  const stepIns = step === 5
+    ? ins
+    : step >= 1 ? ins.filter(i => i.component === COMP_KEYS[step - 1]) : [];
 
   const existing = useLiveQuery<Assessment[]>(
     () => (pid ? db.assessments.where('supervisorId').equals(pid).toArray() : Promise.resolve([] as Assessment[])),
@@ -79,6 +82,17 @@ export function AssessmentPageV2() {
     setForms(x => ({ ...x, [id]: { ...x[id], ...v } }));
   }, []);
 
+  /**
+   * Baris ringkas untuk langkah 5 (Catatan Hasil & RTL): gabungan centang yang
+   * sedang di layar dengan data instrumen baku.
+   */
+  const barisRingkas = useMemo(
+    () => ins.map(i => ({ ind: i, a: forms[i.id] as Partial<Assessment> | undefined })),
+    [ins, forms],
+  );
+  const catatan = useMemo(() => catatanHasil(barisRingkas), [barisRingkas]);
+  const rtl = useMemo(() => rekapRTL(barisRingkas), [barisRingkas]);
+
   const stepDone = useMemo(() => {
     const done = [!!pid];
     for (let c = 0; c < 4; c++) {
@@ -88,6 +102,9 @@ export function AssessmentPageV2() {
         return f && (f.na || f.score !== undefined);
       });
     }
+    // Langkah 5 (Catatan Hasil & RTL) dianggap selesai bila seluruh butir
+    // sudah dinilai — ringkasannya sendiri terhitung otomatis dari skor.
+    done[5] = done[1] && done[2] && done[3] && done[4];
     return done;
   }, [pid, ins, forms]);
 
@@ -213,7 +230,7 @@ export function AssessmentPageV2() {
         <>
           <ProgressSteps step={step} setStep={setStep} done={stepDone} />
 
-          {step >= 1 && (
+          {step >= 1 && step <= 4 && (
             <IndicatorList
               indicators={stepIns}
               forms={forms}
@@ -231,6 +248,70 @@ export function AssessmentPageV2() {
             />
           )}
 
+          {/* ===== STEP 5: Catatan Hasil Penilaian & Rencana Tindak Lanjut ===== */}
+          {step === 5 && (
+            <>
+              <Card>
+                <h3 className="font-bold text-[#173f70] mb-1">Catatan Hasil Penilaian</h3>
+                <p className="text-xs text-slate-500 mb-3">
+                  Terhitung otomatis dari skor seluruh komponen (K1–K4). Tidak perlu diisi manual.
+                </p>
+                <div className="border border-slate-300 rounded-lg p-3 text-sm leading-relaxed space-y-2 bg-slate-50">
+                  {catatan.map((t, i) => <p key={i}>{t}</p>)}
+                  <p>
+                    Nilai akhir <b>{live.final.toFixed(2)}</b> dengan predikat <b>{live.predicate}</b>
+                    {Object.keys(live.components).length
+                      ? ` (K1: ${live.components.K1?.toFixed(2)}, K2: ${live.components.K2?.toFixed(2)}, K3: ${live.components.K3?.toFixed(2)}, K4: ${live.components.K4?.toFixed(2)})`
+                      : ''}.
+                  </p>
+                </div>
+              </Card>
+
+              <Card className="mt-4">
+                <h3 className="font-bold text-[#173f70] mb-1">Rencana Tindak Lanjut</h3>
+                <p className="text-xs text-slate-500 mb-3">
+                  Berdasarkan butir berskor 0–1 dari seluruh komponen, urut dari skor terendah.
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 text-left">
+                        <th className={`${TABLE_CELL} w-24`}>Kode</th>
+                        <th className={`${TABLE_CELL} w-14 text-center`}>Skor</th>
+                        <th className={TABLE_CELL}>Masalah / Kesenjangan</th>
+                        <th className={TABLE_CELL}>Tindakan Perbaikan &amp; Produk</th>
+                        <th className={`${TABLE_CELL} w-32`}>Bentuk PKB</th>
+                        <th className={`${TABLE_CELL} w-28`}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rtl.length ? rtl.map(x => (
+                        <tr key={x.code}>
+                          <td className={TABLE_CELL}>{x.code}</td>
+                          <td className={`${TABLE_CELL} text-center font-semibold`}>{x.score}</td>
+                          <td className={TABLE_CELL}>{x.masalah}</td>
+                          <td className={TABLE_CELL}>
+                            {x.tindakan}
+                            <br />
+                            <span className="text-slate-600">Produk: {x.produk}</span>
+                          </td>
+                          <td className={TABLE_CELL}>{x.bentukPKB}</td>
+                          <td className={TABLE_CELL}>{x.status}</td>
+                        </tr>
+                      )) : (
+                        <tr>
+                          <td className={`${TABLE_CELL} text-center`} colSpan={6}>
+                            Tidak ada butir berskor 0–1. Rencana tindak lanjut difokuskan pada pemeliharaan dan penguatan mutu.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            </>
+          )}
+
           {/* Navigation — menempel di bawah layar pada HP agar tombol selalu terlihat */}
           <div className="sticky bottom-0 z-10 -mx-4 md:mx-0 mt-4 px-4 md:px-0 py-3 md:py-0 bg-slate-50/95 md:bg-transparent backdrop-blur border-t border-slate-200 md:border-0 flex justify-between items-center gap-2 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:pb-0">
             <Button variant="light" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>
@@ -240,7 +321,7 @@ export function AssessmentPageV2() {
               <Button variant="light" onClick={() => save()} disabled={saving}>
                 <Save size={16} className="inline" /> Simpan
               </Button>
-              {step < 4 ? (
+              {step < 5 ? (
                 <Button onClick={() => save().then(() => setStep(step + 1))} disabled={saving}>
                   Lanjut <ChevronRight size={16} className="inline" />
                 </Button>

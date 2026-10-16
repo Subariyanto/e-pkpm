@@ -6,6 +6,7 @@ export const STEPS = [
   'K2 — Pelaksanaan Program Pengawasan',
   'K3 — Evaluasi Hasil Pelaksanaan Program Pengawasan',
   'K4 — Pembimbingan dan Pelatihan Profesional',
+  'Catatan Hasil & RTL',
 ];
 
 export const COMP_KEYS = ['K1', 'K2', 'K3', 'K4'] as const;
