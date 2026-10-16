@@ -629,7 +629,7 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
     `Laporan Hasil Penilaian Kinerja Pengelolaan Kinerja Pengawas Madrasah (PKPM) ${namaOrganisasi} ${kabupaten} periode ${periode} ini disusun sebagai bentuk pertanggungjawaban pelaksanaan penilaian kinerja pengawas madrasah. Laporan memuat hasil penilaian ${total} pengawas pada empat komponen penilaian, yaitu ${NAMA_KOMPONEN.K1.judul}, ${NAMA_KOMPONEN.K2.judul}, ${NAMA_KOMPONEN.K3.judul}, dan ${NAMA_KOMPONEN.K4.judul}, beserta analisis capaian dan prioritas pengembangan keprofesian berkelanjutan.`,
     M, y, LEBAR,
   );
-  y += 6;
+  y += 8;
   y = tulisParagraf(
     doc,
     `Laporan ini telah diperiksa dan disahkan untuk digunakan sebagaimana mestinya, baik sebagai bahan pembinaan pengawas madrasah, bahan penyusunan program pengawasan tahun berikutnya, maupun sebagai bahan pelaporan kepada Kepala Kantor Kementerian Agama ${kabupaten}.`,
@@ -637,35 +637,38 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
   );
   y += 14;
 
-  // Hanya dua kolom tanda tangan: kiri Kepala Kantor (mengesahkan),
-  // kanan Ketua Pokjawas Madrasah. Jarak "kota, tanggal" ke tanda tangan
-  // dijaga satu spasi (3.6 mm) supaya tidak terlalu jauh.
+  // Dua kolom tanda tangan, digeser ke kanan sampai lurus dengan batas
+  // paragraf: kolom kiri mulai di margin kiri (M) dan kolom kanan berakhir
+  // di margin kanan (M + LEBAR). Nama dan NIP disejajarkan kanan di dalam
+  // masing-masing kolom supaya rapi.
+  const LEBAR_TTD = 66;
+  const xKiri = M;
+  const xKanan = M + LEBAR - LEBAR_TTD;
   doc.setFontSize(11);
-  doc.text(`${kota}, ${hariIni}`, 108, y);
+  doc.text(`${kota}, ${hariIni}`, xKanan + LEBAR_TTD, y, { align: 'right' });
   y += 3.6;
 
   const kolomTtd = [
-    { x: 14, label: 'Mengesahkan,', jabatan: `Kepala Kantor Kemenag ${kota}`, nama: namaKantor, nip: nipKantor },
-    { x: 112, label: 'Ketua Pokjawas Madrasah,', jabatan: '', nama: namaKetua, nip: nipKetua },
+    { x: xKiri, label: 'Mengesahkan,', jabatan: `Kepala Kantor Kemenag ${kota}`, nama: namaKantor, nip: nipKantor },
+    { x: xKanan, label: 'Ketua Pokjawas Madrasah,', jabatan: '', nama: namaKetua, nip: nipKetua },
   ];
   for (const k of kolomTtd) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     let yk = y;
-    doc.text(k.label, k.x, yk);
+    doc.text(k.label, k.x + LEBAR_TTD, yk, { align: 'right' });
     yk += 3.6;
     if (k.jabatan) {
-      const jw = doc.splitTextToSize(k.jabatan, 78);
-      doc.text(jw, k.x, yk);
+      const jw = doc.splitTextToSize(k.jabatan, LEBAR_TTD);
+      doc.text(jw, k.x + LEBAR_TTD, yk, { align: 'right' });
       yk += jw.length * 3.6;
     }
-    yk += 20;
+    yk += 18;
     doc.setFont('helvetica', 'bold');
-    doc.text(doc.splitTextToSize(k.nama, 78), k.x, yk);
+    doc.text(doc.splitTextToSize(k.nama, LEBAR_TTD), k.x + LEBAR_TTD, yk, { align: 'right' });
     doc.setFont('helvetica', 'normal');
-    doc.text(k.nama.length < 60 ? k.nama.replace(/./g, '_') : '', k.x, yk);
     doc.setFontSize(8);
-    doc.text(`NIP. ${k.nip}`, k.x, yk + 3.6);
+    doc.text(`NIP. ${k.nip}`, k.x + LEBAR_TTD, yk + 3.6, { align: 'right' });
   }
 
   // ===== 3. KATA PENGANTAR ==================================================
@@ -703,14 +706,14 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
     M, y, LEBAR,
   );
   y += 14;
-  doc.text(`${kota}, ${hariIni}`, 112, y);
+  doc.text(`${kota}, ${hariIni}`, xKanan + LEBAR_TTD, y, { align: 'right' });
   y += 3.6;
   doc.setFont('helvetica', 'bold');
-  doc.text('Ketua Pokjawas Madrasah,', 112, y);
+  doc.text('Ketua Pokjawas Madrasah,', xKanan + LEBAR_TTD, y, { align: 'right' });
   doc.setFont('helvetica', 'normal');
-  doc.text(doc.splitTextToSize(namaKetua, 70), 112, y + 20);
+  doc.text(doc.splitTextToSize(namaKetua, LEBAR_TTD), xKanan + LEBAR_TTD, y + 18, { align: 'right' });
   doc.setFontSize(8);
-  doc.text(`NIP. ${nipKetua}`, 112, y + 23.6);
+  doc.text(`NIP. ${nipKetua}`, xKanan + LEBAR_TTD, y + 21.6, { align: 'right' });
 
   // ===== 4. DAFTAR ISI (halaman tersendiri, ditulis pada lintasan kedua) ===
   // Halaman ini WAJIB ditambahkan sekarang supaya Bab I tidak menimpa daftar
@@ -736,12 +739,12 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
     doc.setFontSize(11);
     for (const el of bab.isi) {
       if (el.jenis === 'sub') {
-        yy = periksaRuang(yy, 14);
+        yy = periksaRuang(yy, 18);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(11);
         doc.text(bersih(el.teks), M, yy);
         doc.setFont('helvetica', 'normal');
-        yy += 6;
+        yy += 8.5;
         continue;
       }
       if (el.jenis === 'poin') {
@@ -756,13 +759,13 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
           doc.setFontSize(11);
           doc.text(pertama ? `-  ${baris}` : `    ${baris}`, M, yy);
           pertama = false;
-          yy += 4.6;
+          yy += 6.5;
         }
-        yy += 1.6;
+        yy += 2.5;
         continue;
       }
       yy = tulisParagraf(doc, el.teks, M, yy, LEBAR);
-      yy += 3;
+      yy += 4;
     }
     return lanjutDariPoin(yy);
   };
@@ -995,15 +998,17 @@ function tulisTabelPrioritas(
  * Tulis paragraf rata kiri-kanan dengan pembungkusan otomatis dan tambah
  * halaman bila ruang habis.
  */
-function tulisParagraf(doc: jsPDF, teks: string, x: number, y0: number, lebar: number, tinggiBaris = 4.8): number {
+function tulisParagraf(doc: jsPDF, teks: string, x: number, y0: number, lebar: number, tinggiBaris = 6.5): number {
   let y = y0;
+  // Rata kiri-kanan (justify) dengan spasi 1,5 (tinggi baris ±6,5 mm pada
+  // font 11pt). Baris terakhir paragraf tidak direntangkan oleh jsPDF.
   const wrap = doc.splitTextToSize(bersih(teks), lebar);
   for (const baris of wrap) {
     if (y > 272) {
       doc.addPage();
       y = 24;
     }
-    doc.text(baris, x, y);
+    doc.text(baris, x, y, { align: 'justify', maxWidth: lebar });
     y += tinggiBaris;
   }
   return y;
