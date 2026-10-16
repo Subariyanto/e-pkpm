@@ -643,6 +643,9 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
   // masing-masing kolom supaya rapi.
   const LEBAR_TTD = 70;
   const xKiri = M;
+  // Blok tanda tangan tunggal (Kata Pengantar) ditaruh di tengah halaman,
+  // digeser sedikit ke kanan supaya tidak terkesan menggantung di tengah.
+  const xTunggal = 105 + 14 - LEBAR_TTD / 2;
   const xKanan = M + LEBAR - LEBAR_TTD;
   /** Titik tengah kolom tanda tangan; teks ditulis rata tengah di titik ini. */
   const tengahTtd = (x: number) => x + LEBAR_TTD / 2;
@@ -708,14 +711,14 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
     M, y, LEBAR,
   );
   y += 14;
-  doc.text(`${kota}, ${hariIni}`, tengahTtd(xKanan), y, { align: 'center' });
+  doc.text(`${kota}, ${hariIni}`, tengahTtd(xTunggal), y, { align: 'center' });
   y += 3.6;
   doc.setFont('helvetica', 'bold');
-  doc.text('Ketua Pokjawas Madrasah,', tengahTtd(xKanan), y, { align: 'center' });
+  doc.text('Ketua Pokjawas Madrasah,', tengahTtd(xTunggal), y, { align: 'center' });
   doc.setFont('helvetica', 'normal');
-  doc.text(doc.splitTextToSize(namaKetua, LEBAR_TTD), tengahTtd(xKanan), y + 18, { align: 'center' });
+  doc.text(doc.splitTextToSize(namaKetua, LEBAR_TTD), tengahTtd(xTunggal), y + 18, { align: 'center' });
   doc.setFontSize(8);
-  doc.text(`NIP. ${nipKetua}`, tengahTtd(xKanan), y + 21.6, { align: 'center' });
+  doc.text(`NIP. ${nipKetua}`, tengahTtd(xTunggal), y + 21.6, { align: 'center' });
 
   // ===== 4. DAFTAR ISI (halaman tersendiri, ditulis pada lintasan kedua) ===
   // Halaman ini WAJIB ditambahkan sekarang supaya Bab I tidak menimpa daftar
@@ -751,24 +754,18 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
       }
       if (el.jenis === 'poin') {
         yy = periksaRuang(yy, 14);
-        const wrap = doc.splitTextToSize(bersih(el.teks), LEBAR - 6);
-        let pertama = true;
-        for (const baris of wrap) {
-          if (yy > BAWAH) {
-            yy = halamanBaru();
-            pertama = false;
-          }
-          doc.setFontSize(11);
-          if (pertama) {
-            doc.text(`-  ${baris}`, M, yy);
-          } else {
-            // Baris lanjutan butir: rata kiri-kanan pada lebar teks butir
-            doc.text(baris, M + 4, yy, { align: 'justify', maxWidth: LEBAR - 6 });
-          }
-          pertama = false;
-          yy += 6.5;
+        const lebarPoin = LEBAR - 5;
+        const isiPoin = doc.splitTextToSize(bersih(el.teks), lebarPoin);
+        const tinggiPoin = isiPoin.length * 5.8;
+        if (yy + tinggiPoin > BAWAH && tinggiPoin <= BAWAH - ATAS) {
+          yy = halamanBaru();
         }
-        yy += 2.5;
+        doc.setFontSize(11);
+        doc.text('-', M, yy);
+        doc.setLineHeightFactor(5.8 / (doc.getFontSize() * 0.3528));
+        doc.text(bersih(el.teks), M + 5, yy, { align: 'justify', maxWidth: lebarPoin });
+        doc.setLineHeightFactor(1.15);
+        yy += tinggiPoin + 2.5;
         continue;
       }
       yy = tulisParagraf(doc, el.teks, M, yy, LEBAR);
@@ -1005,21 +1002,38 @@ function tulisTabelPrioritas(
  * Tulis paragraf rata kiri-kanan dengan pembungkusan otomatis dan tambah
  * halaman bila ruang habis.
  */
-function tulisParagraf(doc: jsPDF, teks: string, x: number, y0: number, lebar: number, tinggiBaris = 6.5): number {
+function tulisParagraf(doc: jsPDF, teks: string, x: number, y0: number, lebar: number, tinggiBaris = 5.8): number {
   let y = y0;
-  // Rata kiri-kanan (justify) dengan spasi 1,5 (tinggi baris ±6,5 mm pada
-  // font 11pt). jsPDF hanya merentangkan baris yang masih punya ruang sisa,
-  // jadi baris terakhir paragraf otomatis tidak direntangkan.
   const kalimat = String(bersih(teks));
-  const wrap = doc.splitTextToSize(kalimat, lebar);
-  for (let i = 0; i < wrap.length; i += 1) {
+  const baris = doc.splitTextToSize(kalimat, lebar);
+  const total = baris.length * tinggiBaris;
+
+  // Kalau tidak cukup di sisa halaman, pindah halaman dulu (asal muat satu
+  // halaman penuh). Paragraf yang lebih panjang dari satu halaman tetap
+  // dicetak bertahap supaya tidak ada teks hilang.
+  if (y + total > 272 && total <= 272 - 24) {
+    doc.addPage();
+    y = 24;
+  }
+
+  if (total <= 272 - 24 || y === 24) {
+    // Satu blok sekaligus supaya jsPDF benar-benar merentangkan tiap baris
+    // (rata kiri-kanan). Kalau baris dikirim satu per satu, semuanya dianggap
+    // baris terakhir sehingga tidak pernah dijustify.
+    doc.setLineHeightFactor(tinggiBaris / (doc.getFontSize() * 0.3528));
+    doc.text(kalimat, x, y, { align: 'justify', maxWidth: lebar });
+    doc.setLineHeightFactor(1.15);
+    return y + total;
+  }
+
+  // Paragraf sangat panjang: cetak baris demi baris.
+  for (let i = 0; i < baris.length; i += 1) {
     if (y > 272) {
       doc.addPage();
       y = 24;
     }
-    // Baris terakhir tidak dijustify supaya tidak ada celah menganga.
-    const terakhir = i === wrap.length - 1;
-    doc.text(wrap[i], x, y, terakhir ? undefined : { align: 'justify', maxWidth: lebar });
+    const terakhir = i === baris.length - 1;
+    doc.text(baris[i], x, y, terakhir ? undefined : { align: 'justify', maxWidth: lebar });
     y += tinggiBaris;
   }
   return y;
