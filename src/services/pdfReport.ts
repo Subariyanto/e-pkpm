@@ -201,8 +201,8 @@ function renderIndividual(
     y += 11;
     doc.setTextColor(0, 0, 0);
 
-    const hdr = ['No', 'Indikator', 'Dokumen', 'Skor', 'Kriteria Penilaian', 'Catatan'];
-    const w = [8, 62, 10, 40, 40];
+    const hdr = ['No', 'Indikator', 'Dok', 'Skor', 'Kriteria Penilaian', 'Catatan'];
+    const w = [7, 62, 10, 42, 43];
     w[2] = innerW - w[0] - w[1] - w[4] - w[3];
     const skorCol = margin + w[0] + w[1];
     const dokCol = skorCol + w[2];
@@ -215,7 +215,9 @@ function renderIndividual(
     doc.setFontSize(7.5);
     let hx = margin;
     for (const [hi, h] of hdr.entries()) {
-      doc.text(h, hx + 1.5, y + 4.2);
+      // "Skor" dirapatkan ke tengah kolomnya agar tidak mentok garis pemisah.
+      const pos = hi === 3 ? hx + w[hi] / 2 : hx + 1.5;
+      doc.text(h, pos, y + 4.2, hi === 3 ? { align: 'center' } : undefined);
       hx += w[hi];
     }
     y += 6;
@@ -226,10 +228,23 @@ function renderIndividual(
       const isNA = a?.na;
       const score = a?.score;
       const dok = i.documents?.length ? String(i.documents.length) : '-';
-      const krit = bersih((i.criteria as Record<string, string>)?.[String(score ?? 0)]) || (isNA ? '-' : '-');
-      const cat = bersih(a?.notes || a?.finding || '') || '-';
+      // PDF bawaan jsPDF memakai font standar Windows-1252: huruf di luar
+      // rentang itu (mis. á, š, „) tampil sebagai petak/kotak. Ganti dulu
+      // agar deskriptor rubrik tetap terbaca.
+      const GANTI: Record<string, string> = {
+        '\u0161': 's', '\u0160': 'S', '\u017e': 'z', '\u017d': 'Z',
+        '\u010d': 'c', '\u010c': 'C', '\u0107': 'c', '\u0106': 'C',
+        '\u0111': 'd', '\u0110': 'D', '\u201e': '"', '\u201c': '"',
+        '\u201d': '"', '\u2018': "'", '\u2019': "'", '\u2013': '-',
+        '\u2014': '-', '\u2022': '-', '\u2026': '...', '\u0113': 'e',
+        '\u0117': 'e', '\u012f': 'i', '\u016b': 'u', '\u0101': 'a',
+      };
+      const bersihPdf = (v: unknown) =>
+        bersih(v).replace(/[\u0100-\u02FF\u2010-\u203A]/g, c => GANTI[c] ?? '');
+      const krit = bersihPdf((i.criteria as Record<string, string>)?.[String(score ?? 0)]) || '-';
+      const cat = bersihPdf(a?.notes || a?.finding || '') || '-';
 
-      const txtIndikator = doc.splitTextToSize(`${i.code} — ${bersih(i.title || i.description)}`, w[1] - 3);
+      const txtIndikator = doc.splitTextToSize(bersihPdf(`${i.code} — ${i.title || i.description}`), w[1] - 3);
       const txtKriteria = doc.splitTextToSize(krit, w[4] - 3);
       const txtCatatan = doc.splitTextToSize(cat, w[3] - 3);
       const baris = Math.max(txtIndikator.length, txtKriteria.length, txtCatatan.length, 1);
@@ -499,7 +514,36 @@ export async function generateKetuaPdf(
  */
 export function openPdfTab(blob: Blob): boolean {
   const url = URL.createObjectURL(blob);
-  return !!window.open(url, '_blank');
+  const tab = window.open(url, '_blank');
+  if (tab) setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  return !!tab;
+}
+
+/**
+ * Buka PDF lalu langsung munculkan Pengaturan Cetak browser (Ctrl/Cmd + P),
+ * sehingga pengguna bisa memilih orientasi potret/lanskap, ukuran kertas,
+ * dan margin sebelum mencetak atau menyimpan PDF.
+ *
+ * @returns true jika tab berhasil dibuka
+ */
+export function printPdf(blob: Blob): boolean {
+  const url = URL.createObjectURL(blob);
+  const tab = window.open(url, '_blank');
+  if (!tab) return false;
+  // Tunggu viewer PDF memuat berkas, baru buka pengaturan cetak.
+  const pinjam = tab as Window & { __cetak?: boolean };
+  setTimeout(() => {
+    try {
+      if (!pinjam.__cetak && !pinjam.closed) {
+        pinjam.__cetak = true;
+        pinjam.focus();
+        pinjam.print();
+      }
+    } catch {
+      /* pengguna tetap dapat menekan Ctrl/Cmd + P secara manual */
+    }
+  }, 900);
+  return true;
 }
 
 export function downloadBlob(blob: Blob, filename: string) {
