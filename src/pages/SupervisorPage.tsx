@@ -26,10 +26,8 @@ const KOSONG: Form = {
 
 const LEVEL = ['Muda', 'Madya', 'Utama'];
 
-/** Pilihan pangkat/golongan ruang PNS sesuai PMA/PP, golongan I–IV. */
+/** Pilihan pangkat/golongan ruang pengawas: golongan III ke atas. */
 export const PANGKAT_GOL = [
-  'Juru Muda / I a', 'Juru Muda Tk. I / I b', 'Juru / I c', 'Juru Tk. I / I d',
-  'Pengatur Muda / II a', 'Pengatur Muda Tk. I / II b', 'Pengatur / II c', 'Pengatur Tk. I / II d',
   'Penata Muda / III a', 'Penata Muda Tk. I / III b', 'Penata / III c', 'Penata Tk. I / III d',
   'Pembina / IV a', 'Pembina Tk. I / IV b', 'Pembina Utama Muda / IV c',
   'Pembina Utama Madya / IV d', 'Pembina Utama / IV e',
