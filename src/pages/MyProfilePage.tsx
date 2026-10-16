@@ -57,11 +57,16 @@ export function MyProfilePage() {
   const [kop3, setKop3] = useState('');
   const [kop4, setKop4] = useState('');
   const [info, setInfo] = useState('');
+  const [ketuaPokjawas, setKetuaPokjawas] = useState('');
+  const [nipKetua, setNipKetua] = useState('');
+  const [kepalaKantor, setKepalaKantor] = useState('');
+  const [nipKantor, setNipKantor] = useState('');
   const [form, setForm] = useState<SasaranForm | null>(null);
   const [formId, setFormId] = useState<string | null>(null); // null = mode tambah
   const [formErr, setFormErr] = useState('');
 
   const profil = useLiveQuery(() => db.settings.get('profilPenilai'), []);
+  const orgRow = useLiveQuery(() => db.org.toCollection().first(), []);
   const p = profil?.value as {
     nama?: string; nip?: string; jabatan?: string; unit?: string;
     kabupaten?: string; kop?: string[];
@@ -99,6 +104,22 @@ export function MyProfilePage() {
     setNama(''); setNip(''); setJabatan(''); setUnit('');
     setKabupaten(''); setKop1(''); setKop2(''); setKop3(''); setKop4('');
     setInfo('Profil penilai dan kop surat tersimpan di perangkat ini.');
+  }
+
+  /** Simpan data pejabat penandatangan ke tabel org. */
+  async function simpanPejabat() {
+    if (!orgRow) return setInfo('Data organisasi belum tersedia.');
+    const ketua = (ketuaPokjawas || orgRow.chairman || '').trim();
+    const kantor = (kepalaKantor || orgRow.headOffice || '').trim();
+    const nipK = (nipKetua || (orgRow as any).nipChairman || '').trim();
+    const nipKn = (nipKantor || (orgRow as any).nipHeadOffice || '').trim();
+    await db.org.update(orgRow.id, {
+      chairman: ketua, headOffice: kantor,
+      nipChairman: nipK, nipHeadOffice: nipKn,
+    } as any);
+    await audit('PEJABAT_TTD', 'Penandatangan', { ketua, kantor });
+    setKetuaPokjawas(''); setNipKetua(''); setKepalaKantor(''); setNipKantor('');
+    setInfo('Nama dan NIP pejabat penandatangan tersimpan.');
   }
 
   /** Buka form tambah sasaran (kosong). */
@@ -294,6 +315,37 @@ export function MyProfilePage() {
         </div>
         <div className="mt-4">
           <Button onClick={simpanProfil}>{p?.nama ? 'Perbarui Profil' : 'Simpan Profil'}</Button>
+        </div>
+      </Card>
+
+      {/* ===== Pejabat Penandatangan ===== */}
+      <Card className="mt-5">
+        <h3 className="font-bold text-[#173f70] mb-1">Pejabat Penandatangan</h3>
+        <p className="text-xs text-slate-500 mb-4">Nama &amp; NIP ini akan terisi otomatis pada tanda tangan laporan PDF.</p>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm block">Ketua Pokjawas Madrasah
+              <input className="input mt-1" value={ketuaPokjawas} onChange={e => setKetuaPokjawas(e.target.value)}
+                placeholder={orgRow?.chairman || 'Nama lengkap + gelar'} />
+            </label>
+            <label className="text-sm block">NIP Ketua Pokjawas
+              <input className="input mt-1" value={nipKetua} onChange={e => setNipKetua(e.target.value)}
+                placeholder={(orgRow as any)?.nipChairman || '18 digit NIP'} />
+            </label>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm block">Kepala Kantor Kemenag
+              <input className="input mt-1" value={kepalaKantor} onChange={e => setKepalaKantor(e.target.value)}
+                placeholder={orgRow?.headOffice || 'Nama lengkap + gelar'} />
+            </label>
+            <label className="text-sm block">NIP Kepala Kantor
+              <input className="input mt-1" value={nipKantor} onChange={e => setNipKantor(e.target.value)}
+                placeholder={(orgRow as any)?.nipHeadOffice || '18 digit NIP'} />
+            </label>
+          </div>
+        </div>
+        <div className="mt-3">
+          <Button size="sm" onClick={simpanPejabat}>Simpan Penandatangan</Button>
         </div>
       </Card>
 

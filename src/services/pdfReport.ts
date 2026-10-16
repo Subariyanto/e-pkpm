@@ -56,22 +56,29 @@ const KOMPONEN_INFO: Record<string, { urut: string; judul: string; bobot: number
   K4: { urut: 'D.', judul: 'Pembimbingan dan Pelatihan', bobot: 30 },
 };
 
-/** Blok tanda tangan: pihak kanan (Kepala Kantor) dan pihak kiri (Ketua Pokjawas). */
-function tandaTangan(doc: jsPDF, org: OrgLike, kota: string) {
-  const y0 = 232;
-  const kiri = 15, kanan = 120;
+/** Blok tanda tangan: kiri Ketua Pokjawas, kanan Kepala Kantor.
+ *  Posisi mengikuti akhir konten (y0 disuplai pemanggil), bukan hardcoded. */
+function tandaTangan(doc: jsPDF, org: OrgLike, kota: string, y0: number) {
+  const kiri = 15, kanan = 110;
+  const namaKetua = bersih(org.chairman) || '_________________________';
+  const namaKantor = bersih(org.headOffice) || '_________________________';
+  const nipKetua = bersih((org as any).nipChairman) || '..............................';
+  const nipKantor = bersih((org as any).nipHeadOffice) || '..............................';
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
+  // Baris tanggal + jabatan
   doc.text(`${kota}, ${tanggalIndo(new Date().toISOString())}`, kanan, y0);
   doc.text('Mengetahui,', kiri, y0);
-  doc.text('Kepala Kantor,', kanan, y0 + 5);
-  doc.text('Ketua Pokjawas,', kiri, y0 + 5);
+  doc.text('Kepala Kantor Kemenag,', kanan, y0 + 5);
+  doc.text('Ketua Pokjawas Madrasah,', kiri, y0 + 5);
+  // Ruang tanda tangan (3 baris ≈ 12mm)
   doc.setFont('helvetica', 'bold');
-  doc.text(bersih(org.headOffice) || '_________________________', kanan, y0 + 32);
-  doc.text(bersih(org.chairman) || '_________________________', kiri, y0 + 32);
+  doc.text(namaKantor, kanan, y0 + 20);
+  doc.text(namaKetua, kiri, y0 + 20);
   doc.setFont('helvetica', 'normal');
-  doc.text('NIP. ................................', kanan, y0 + 37);
-  doc.text('NIP. ................................', kiri, y0 + 37);
+  doc.setFontSize(8);
+  doc.text(`NIP. ${nipKantor}`, kanan, y0 + 25);
+  doc.text(`NIP. ${nipKetua}`, kiri, y0 + 25);
 }
 
 function renderIndividual(
@@ -376,15 +383,17 @@ function renderIndividual(
   }
   y += 4;
 
-  // Tanda tangan
-  if (y > 215) { doc.addPage(); y = 20; }
+  // Tanda tangan — menempel 8mm di bawah konten terakhir
+  if (y > 250) { doc.addPage(); y = 20; }
   const kota = bersih((org as OrgLike).district).replace(/^kabupaten\s+/i, '') || 'Jember';
-  tandaTangan(doc, org, kota);
+  tandaTangan(doc, org, kota, y + 8);
+  y += 38;
 
   // Catatan verifikasi
   doc.setFontSize(7);
   doc.setTextColor(100, 100, 100);
-  doc.text(`Dokumen ini diterbitkan melalui e-PKPM. Verifikasi keaslian: https://pkpm.pokjawasjember.com/verify/${bersih(result.id)}`, margin, 288);
+  if (y > 285) { doc.addPage(); y = 20; }
+  doc.text(`Dokumen ini diterbitkan melalui e-PKPM. Verifikasi keaslian: https://pkpm.pokjawasjember.com/verify/${bersih(result.id)}`, margin, y);
 }
 
 /** PDF laporan individu untuk satu pengawas. */

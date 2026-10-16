@@ -4,7 +4,7 @@ export type InstrumentVersion='legacy-1-4'|'pkpm-0-2-v2';
 export type Level='Muda'|'Madya'|'Utama';
 export type RtlStatus='belum'|'proses'|'selesai';
 export type Jenjang=Level;
-export interface Org {id:string;name:string;district:string;province:string;chairman:string;headOffice:string;address:string;phone:string;email:string;period:string}
+export interface Org {id:string;name:string;district:string;province:string;chairman:string;headOffice:string;address:string;phone:string;email:string;period:string;nipChairman?:string;nipHeadOffice?:string}
 export interface User {id:string;name:string;username:string;pinHash:string;roles:Role[];nip:string;active:boolean;failed:number;lockedUntil?:number;
  /** Pangkat/golongan ruang, mis. "Pembina / IV a". */
  rank?:string;
