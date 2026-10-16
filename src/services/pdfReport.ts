@@ -135,19 +135,22 @@ function renderIndividual(
   doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'normal');
   const identity = [
-    ['Nama', ': ' + bersih(supervisor.name)],
-    ['NIP', ': ' + bersih(supervisor.nip)],
-    ['Pangkat / Golongan', ': ' + (bersih(supervisor.rank) || '-')],
-    ['Jenjang Jabatan', ': ' + jenjang],
-    ['Satuan Kerja', ': ' + (bersih(supervisor.workUnit) || '-')],
-    ['Wilayah Binaan', ': ' + (bersih(supervisor.region) || '-')],
+    ['Nama', bersih(supervisor.name)],
+    ['NIP', bersih(supervisor.nip)],
+    ['Pangkat / Golongan', bersih(supervisor.rank) || '-'],
+    ['Jenjang Jabatan', jenjang],
+    ['Satuan Kerja', bersih(supervisor.workUnit) || '-'],
+    ['Wilayah Binaan', bersih(supervisor.region) || '-'],
   ];
+  // Kolom nilai dibuat rata kiri pada satu posisi tetap sehingga seluruh
+  // titik dua lurus satu garis, sama seperti bagian B dan C.
+  const kolonNilai = margin + 48;
   for (const [k, v] of identity) {
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
     doc.text(k, margin, y);
     doc.setFont('helvetica', 'normal');
-    doc.text(v, margin + 45, y);
+    doc.text(': ' + v, kolonNilai, y);
     y += 5;
   }
   y += 3;
@@ -163,11 +166,22 @@ function renderIndividual(
   doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.text(`Nomor SK / Surat Tugas: ${bersih(result.skPenugasan || result.skNumber) || '-'}`, margin, y); y += 5;
-  doc.text(`Tanggal SK: ${tanggalIndo(result.tanggalSk || result.skDate)}`, margin, y); y += 5;
-  doc.text(`Penilai: ${bersih(penilai) || '-'}`, margin, y); y += 5;
-  doc.text(`Mekanisme: ${bersih(result.mekanismePenilaian || result.mechanism) || 'individual'}`, margin, y); y += 5;
-  doc.text(`Tanggal Finalisasi: ${tanggalIndo(result.finalizedAt)}`, margin, y); y += 5;
+  const penugasan = [
+    ['Nomor SK / Surat Tugas', bersih(result.skPenugasan || result.skNumber) || '-'],
+    ['Tanggal SK', tanggalIndo(result.tanggalSk || result.skDate)],
+    ['Penilai', bersih(penilai) || '-'],
+    ['Mekanisme', bersih(result.mekanismePenilaian || result.mechanism) || 'individual'],
+    ['Tanggal Finalisasi', tanggalIndo(result.finalizedAt)],
+  ];
+  // Sama seperti bagian A: label di kiri, titik dua pada satu kolom tetap.
+  const kolonNilai2 = margin + 48;
+  for (const [k, v] of penugasan) {
+    doc.setFont('helvetica', 'bold');
+    doc.text(k, margin, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(': ' + v, kolonNilai2, y);
+    y += 5;
+  }
 
   // Dasar Hukum
   const regulasiUtama = regulasi.filter(r => r.status === 'berlaku').slice(0, 3);
