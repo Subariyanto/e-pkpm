@@ -797,8 +797,11 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
     const akhirBab = tulisBab(bab, (yy) => yy);
     babAwal.push(doc.getNumberOfPages());
     if (bab.no === 'IV') {
-      let yy = akhirBab + 4;
-      yy = periksaRuang(yy, 45);
+      // Tabel prioritas dicetak tepat setelah sub-bab B, pada halaman yang
+      // sama bila masih cukup, kalau tidak pindah ke halaman berikutnya.
+      const perkiraanBaris = Math.min(prioritasLengkap.length, 1) * 14;
+      let yy = akhirBab + 3;
+      yy = periksaRuang(yy, 22 + perkiraanBaris);
       tulisTabelPrioritas(doc, yy, prioritasLengkap, M, LEBAR);
     }
   }
