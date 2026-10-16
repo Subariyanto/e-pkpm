@@ -676,7 +676,9 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
       },
     },
     {
-      tinggi: 5.8 * 2 + 16 + 3.6,
+      // Jarak ke nama = 2 spasi (sesuai permintaan sebelumnya) + 16 mm ruang
+      // tanda tangan + 3 spasi, dalam ukuran 1,5 spasi (5,8 mm).
+      tinggi: 5.8 * 2 + 16 + 5.8 * 3 + 3.6,
       cetak: (k, yb) => {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(11);
