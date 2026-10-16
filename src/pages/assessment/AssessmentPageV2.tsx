@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, audit } from '../../lib/db';
 import { Button, Card, PageTitle } from '../../components/Layout';
@@ -47,6 +47,21 @@ export function AssessmentPageV2() {
 
   const result = useLiveQuery(() => (pid ? db.results.get(`2026-${pid}`) : undefined), [pid]);
   const locked = result?.status === 'final';
+  /** Penanda pid yang nomor/tanggal SK-nya sudah dimuat, agar isian tidak tertimpa. */
+  const skDimuat = useRef<string | null>(null);
+
+  /**
+   * Muat kembali Nomor SK dan Tanggal SK yang sudah tersimpan pada hasil
+   * penilaian. Tanpa ini, kolom tampak kosong setiap kali halaman dibuka ulang
+   * atau penilai berpindah sasaran, padahal datanya sudah tersimpan.
+   */
+  useEffect(() => {
+    if (!pid) { skDimuat.current = null; setSkNumber(''); setSkDate(''); return; }
+    if (!result || skDimuat.current === pid) return;
+    skDimuat.current = pid;
+    setSkNumber(prev => prev || result.skPenugasan || result.skNumber || '');
+    setSkDate(prev => prev || result.tanggalSk || result.skDate || '');
+  }, [pid, result]);
 
   /**
    * Hasil hitung langsung dari centang yang sedang di layar (belum disimpan).
@@ -95,7 +110,12 @@ export function AssessmentPageV2() {
         if (!skNumber.trim()) { alert('Nomor SK/surat tugas penugasan wajib diisi sebelum finalisasi.'); return; }
       }
       await db.assessments.bulkPut(rows);
-      await saveResult(pid, supervisor?.assessorId || 'u1', rows, ins, final, { skPenugasan: skNumber, tanggalSk: skDate });
+      // Nomor/tanggal SK lama dipertahankan bila kolom sedang kosong,
+      // supaya penyimpanan dari langkah K1–K4 tidak menghapus isian sebelumnya.
+      await saveResult(pid, supervisor?.assessorId || 'u1', rows, ins, final, {
+        skPenugasan: skNumber.trim() || result?.skPenugasan || result?.skNumber,
+        tanggalSk: skDate || result?.tanggalSk || result?.skDate,
+      });
       setLastSaved(new Date().toLocaleTimeString('id-ID'));
       if (final) {
         await audit('FINALISASI', `Penilaian ${supervisor?.name}`, { sk: skNumber });
@@ -144,8 +164,7 @@ export function AssessmentPageV2() {
             </label>
             <label className="text-sm">Tanggal SK
               <input type="date" disabled={locked} className="input mt-1" value={skDate} onChange={e => setSkDate(e.target.value)} />
-            </label>
-          </div>
+            </label>          </div>
           <p className="text-xs text-slate-500 mt-3">Mekanisme penilaian: individual (satu penilai per pengawas)</p>
         </Card>
         <div className="sticky bottom-0 z-10 -mx-4 md:mx-0 mt-4 px-4 md:px-0 py-3 md:py-0 bg-slate-50/95 md:bg-transparent backdrop-blur border-t border-slate-200 md:border-0 flex justify-end gap-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:pb-0">
