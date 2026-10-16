@@ -635,29 +635,37 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
     `Laporan ini telah diperiksa dan disahkan untuk digunakan sebagaimana mestinya, baik sebagai bahan pembinaan pengawas madrasah, bahan penyusunan program pengawasan tahun berikutnya, maupun sebagai bahan pelaporan kepada Kepala Kantor Kementerian Agama ${kabupaten}.`,
     M, y, LEBAR,
   );
-  y += 20;
+  y += 14;
 
+  // Hanya dua kolom tanda tangan: kiri Kepala Kantor (mengesahkan),
+  // kanan Ketua Pokjawas Madrasah. Jarak "kota, tanggal" ke tanda tangan
+  // dijaga satu spasi (3.6 mm) supaya tidak terlalu jauh.
   doc.setFontSize(11);
-  doc.text(`${kota}, ${hariIni}`, 138, y);
-  y += 24;
+  doc.text(`${kota}, ${hariIni}`, 108, y);
+  y += 3.6;
 
   const kolomTtd = [
-    { x: 14, label: 'Mengetahui,', jabatan: 'Ketua Pokjawas Madrasah', nama: namaKetua, nip: nipKetua },
-    { x: 80, label: 'Diperiksa oleh,', jabatan: 'Pengawas Madya', nama: '(.............................)', nip: '..............................' },
-    { x: 140, label: 'Disahkan oleh,', jabatan: `Kepala Kantor Kemenag ${kota}`, nama: namaKantor, nip: nipKantor },
+    { x: 14, label: 'Mengesahkan,', jabatan: `Kepala Kantor Kemenag ${kota}`, nama: namaKantor, nip: nipKantor },
+    { x: 112, label: 'Ketua Pokjawas Madrasah,', jabatan: '', nama: namaKetua, nip: nipKetua },
   ];
   for (const k of kolomTtd) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-    doc.text(k.label, k.x, y);
-    const jw = doc.splitTextToSize(k.jabatan, 58);
-    doc.text(jw, k.x, y + 4.5);
+    let yk = y;
+    doc.text(k.label, k.x, yk);
+    yk += 3.6;
+    if (k.jabatan) {
+      const jw = doc.splitTextToSize(k.jabatan, 78);
+      doc.text(jw, k.x, yk);
+      yk += jw.length * 3.6;
+    }
+    yk += 20;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.text(doc.splitTextToSize(k.nama, 58), k.x, y + 30);
+    doc.text(doc.splitTextToSize(k.nama, 78), k.x, yk);
     doc.setFont('helvetica', 'normal');
+    doc.text(k.nama.length < 60 ? k.nama.replace(/./g, '_') : '', k.x, yk);
     doc.setFontSize(8);
-    doc.text(`NIP. ${k.nip}`, k.x, y + 34);
+    doc.text(`NIP. ${k.nip}`, k.x, yk + 3.6);
   }
 
   // ===== 3. KATA PENGANTAR ==================================================
@@ -694,18 +702,21 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
     `Semoga laporan ini memberikan manfaat bagi peningkatan mutu pengawasan madrasah dan pengembangan kompetensi pengawas madrasah di lingkungan Kantor Kementerian Agama ${kabupaten}.`,
     M, y, LEBAR,
   );
-  y += 20;
-  doc.text(`${kota}, ${hariIni}`, 138, y);
-  y += 22;
+  y += 14;
+  doc.text(`${kota}, ${hariIni}`, 112, y);
+  y += 3.6;
   doc.setFont('helvetica', 'bold');
-  doc.text('Ketua Pokjawas Madrasah', 138, y);
+  doc.text('Ketua Pokjawas Madrasah,', 112, y);
   doc.setFont('helvetica', 'normal');
-  doc.text(doc.splitTextToSize(namaKetua, 60), 138, y + 26);
+  doc.text(doc.splitTextToSize(namaKetua, 70), 112, y + 20);
   doc.setFontSize(8);
-  doc.text(`NIP. ${nipKetua}`, 138, y + 30);
+  doc.text(`NIP. ${nipKetua}`, 112, y + 23.6);
 
-  // ===== 4. DAFTAR ISI (placeholder) =======================================
+  // ===== 4. DAFTAR ISI (halaman tersendiri, ditulis pada lintasan kedua) ===
+  // Halaman ini WAJIB ditambahkan sekarang supaya Bab I tidak menimpa daftar
+  // isi saat penulisan bab. Isinya diisi di akhir lewat doc.setPage().
   const halamanDaftarIsi = doc.getNumberOfPages() + 1;
+  doc.addPage();
 
   // ===== 5-10. BAB I - VI ==================================================
   const tulisBab = (bab: Bab, lanjutDariPoin: (yy: number) => number): number => {
@@ -758,8 +769,8 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
 
   const babAwal: number[] = [];
   for (const bab of babData) {
-    babAwal.push(doc.getNumberOfPages() + 1);
     const akhirBab = tulisBab(bab, (yy) => yy);
+    babAwal.push(doc.getNumberOfPages());
     if (bab.no === 'IV') {
       let yy = akhirBab + 4;
       yy = periksaRuang(yy, 45);
@@ -900,7 +911,6 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
     }
     yd += 7;
   }
-  void halamanBabI;
 
   // ===== FOOTER NOMOR HALAMAN (kecuali cover & pengesahan) =================
   const totalHalaman = doc.getNumberOfPages();
