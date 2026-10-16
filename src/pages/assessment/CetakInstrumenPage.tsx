@@ -399,7 +399,7 @@ export function CetakInstrumenPage() {
 
           {/* F. Tanda tangan sejajar */}
           <div className="avoid-break">
-            <p className="text-right text-xs mb-1">{kotaTtd}, {tanggalCetak}</p>
+            <p className="text-center text-xs mb-1">{kotaTtd}, {tanggalCetak}</p>
             <table className="w-full text-xs">
               <tbody>
                 <tr>
