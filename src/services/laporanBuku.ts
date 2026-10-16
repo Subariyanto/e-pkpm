@@ -655,17 +655,19 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
     { x: xKanan, label: 'Ketua Pokjawas Madrasah,', jabatan: '', nama: namaKetua, nip: nipKetua },
   ];
   for (const k of kolomTtd) {
+    // Jabatan tidak dicetak tebal; hanya nama yang tebal.
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
+    doc.setFontSize(11);
     let yk = y;
     doc.text(k.label, tengahTtd(k.x), yk, { align: 'center' });
-    yk += 3.6;
+    yk += 5.8;
     if (k.jabatan) {
       const jw = doc.splitTextToSize(k.jabatan, LEBAR_TTD);
       doc.text(jw, tengahTtd(k.x), yk, { align: 'center' });
-      yk += jw.length * 3.6;
+      yk += jw.length * 4.6;
     }
-    yk += 18;
+    // Ruang tanda tangan dua spasi, lalu nama dan NIP.
+    yk += 5.8 * 2 + 16;
     doc.setFont('helvetica', 'bold');
     doc.text(doc.splitTextToSize(k.nama, LEBAR_TTD), tengahTtd(k.x), yk, { align: 'center' });
     doc.setFont('helvetica', 'normal');
@@ -706,14 +708,18 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
     M, y, LEBAR,
   );
   y += 14;
-  doc.text(`${kota}, ${hariIni}`, tengahTtd(xTunggal), y, { align: 'center' });
-  y += 3.6;
-  doc.setFont('helvetica', 'bold');
-  doc.text('Ketua Pokjawas Madrasah,', tengahTtd(xTunggal), y, { align: 'center' });
   doc.setFont('helvetica', 'normal');
-  doc.text(doc.splitTextToSize(namaKetua, LEBAR_TTD), tengahTtd(xTunggal), y + 18, { align: 'center' });
+  doc.setFontSize(11);
+  doc.text(`${kota}, ${hariIni}`, tengahTtd(xTunggal), y, { align: 'center' });
+  y += 5.8;
+  doc.text('Ketua Pokjawas Madrasah,', tengahTtd(xTunggal), y, { align: 'center' });
+  // Ruang tanda tangan dua spasi, lalu nama/NIP.
+  y += 5.8 * 2 + 16;
+  doc.setFont('helvetica', 'bold');
+  doc.text(doc.splitTextToSize(namaKetua, LEBAR_TTD), tengahTtd(xTunggal), y, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.text(`NIP. ${nipKetua}`, tengahTtd(xTunggal), y + 21.6, { align: 'center' });
+  doc.text(`NIP. ${nipKetua}`, tengahTtd(xTunggal), y + 3.6, { align: 'center' });
 
   // ===== 4. DAFTAR ISI (halaman tersendiri, ditulis pada lintasan kedua) ===
   // Halaman ini WAJIB ditambahkan sekarang supaya Bab I tidak menimpa daftar
