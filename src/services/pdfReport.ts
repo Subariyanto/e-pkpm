@@ -250,7 +250,7 @@ function renderIndividual(
 
       const txtIndikator = doc.splitTextToSize(bersihPdf(`${i.code} — ${i.title || i.description}`), w[1] - 3);
       const txtKriteria = doc.splitTextToSize(krit, w[4] - 3);
-      const txtCatatan = doc.splitTextToSize(cat, w[3] - 3);
+      const txtCatatan = doc.splitTextToSize(cat, w[5] - 3);
       const baris = Math.max(txtIndikator.length, txtKriteria.length, txtCatatan.length, 1);
       const hBaris = baris * 3.3 + 2.6;
 
