@@ -654,25 +654,43 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
     { x: xKiri, label: 'Mengesahkan,', jabatan: `Kepala Kantor Kemenag ${kota}`, nama: namaKantor, nip: nipKantor },
     { x: xKanan, label: 'Ketua Pokjawas Madrasah,', jabatan: '', nama: namaKetua, nip: nipKetua },
   ];
-  for (const k of kolomTtd) {
-    // Jabatan tidak dicetak tebal; hanya nama yang tebal.
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(11);
-    let yk = y;
-    doc.text(k.label, tengahTtd(k.x), yk, { align: 'center' });
-    yk += 5.8;
-    if (k.jabatan) {
-      const jw = doc.splitTextToSize(k.jabatan, LEBAR_TTD);
-      doc.text(jw, tengahTtd(k.x), yk, { align: 'center' });
-      yk += jw.length * 4.6;
-    }
-    // Ruang tanda tangan dua spasi, lalu nama dan NIP.
-    yk += 5.8 * 2 + 16;
-    doc.setFont('helvetica', 'bold');
-    doc.text(doc.splitTextToSize(k.nama, LEBAR_TTD), tengahTtd(k.x), yk, { align: 'center' });
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.text(`NIP. ${k.nip}`, tengahTtd(k.x), yk + 3.6, { align: 'center' });
+  // Blok tanda tangan disusun baris demi baris dengan nomor baris yang sama
+  // untuk kedua kolom, supaya nama, NIP, dan baris jabatan benar-benar
+  // sejajar mendatar antara kolom kiri dan kolom kanan.
+  const barisTtd: Array<{ tinggi: number; cetak: (k: KolomTtd, yb: number) => void }> = [
+    {
+      tinggi: 5.8,
+      cetak: (k, yb) => {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(11);
+        doc.text(k.label, tengahTtd(k.x), yb, { align: 'center' });
+      },
+    },
+    {
+      tinggi: 11.6,
+      cetak: (k, yb) => {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(11);
+        const jw = k.jabatan ? doc.splitTextToSize(k.jabatan, LEBAR_TTD) : [];
+        if (jw.length) doc.text(jw, tengahTtd(k.x), yb, { align: 'center' });
+      },
+    },
+    {
+      tinggi: 5.8 * 2 + 16 + 3.6,
+      cetak: (k, yb) => {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text(doc.splitTextToSize(k.nama, LEBAR_TTD), tengahTtd(k.x), yb, { align: 'center' });
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.text(`NIP. ${k.nip}`, tengahTtd(k.x), yb + 3.6, { align: 'center' });
+      },
+    },
+  ];
+  let yb = y;
+  for (const baris of barisTtd) {
+    for (const k of kolomTtd) baris.cetak(k, yb);
+    yb += baris.tinggi;
   }
 
   // ===== 3. KATA PENGANTAR ==================================================
@@ -994,6 +1012,14 @@ function tulisTabelPrioritas(
  * Tulis paragraf rata kiri-kanan dengan pembungkusan otomatis dan tambah
  * halaman bila ruang habis.
  */
+interface KolomTtd {
+  x: number;
+  label: string;
+  jabatan: string;
+  nama: string;
+  nip: string;
+}
+
 function tulisParagraf(doc: jsPDF, teks: string, x: number, y0: number, lebar: number, tinggiBaris = 5.8): number {
   let y = y0;
   const kalimat = String(bersih(teks));
