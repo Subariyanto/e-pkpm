@@ -397,19 +397,21 @@ export function CetakInstrumenPage() {
             </table>
           </div>
 
-          {/* F. Tanda tangan sejajar */}
+          {/* F. Tanda tangan sejajar: kiri Pengawas yang Dinilai, kanan Penilai.
+              Tanggal menempel di kolom kanan, tepat di atas tulisan "Penilai". */}
           <div className="avoid-break">
-            <p className="text-center text-xs mb-1">{kotaTtd}, {tanggalCetak}</p>
             <table className="w-full text-xs">
               <tbody>
                 <tr>
                   <td className="w-1/2 text-center align-top">
+                    <p className="invisible">&nbsp;</p>
                     <p>Pengawas yang Dinilai,</p>
                     <div className="h-24" />
                     <p className="font-semibold underline">{supervisor?.name || '________________________'}</p>
                     <p>NIP. {supervisor?.nip || '____________________'}</p>
                   </td>
                   <td className="w-1/2 text-center align-top">
+                    <p>{kotaTtd}, {tanggalCetak}</p>
                     <p>Penilai,</p>
                     <div className="h-24" />
                     <p className="font-semibold underline">{profil.nama || '________________________'}</p>
