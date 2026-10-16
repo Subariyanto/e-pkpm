@@ -90,7 +90,10 @@ export function AssessmentPageV2() {
     () => ins.map(i => ({ ind: i, a: forms[i.id] as Partial<Assessment> | undefined })),
     [ins, forms],
   );
-  const catatan = useMemo(() => catatanHasil(barisRingkas), [barisRingkas]);
+  const catatan = useMemo(
+    () => catatanHasil(barisRingkas, live, supervisor?.name),
+    [barisRingkas, live, supervisor?.name],
+  );
   const rtl = useMemo(() => rekapRTL(barisRingkas), [barisRingkas]);
 
   const stepDone = useMemo(() => {
@@ -257,13 +260,7 @@ export function AssessmentPageV2() {
                   Terhitung otomatis dari skor seluruh komponen (K1–K4). Tidak perlu diisi manual.
                 </p>
                 <div className="border border-slate-300 rounded-lg p-3 text-sm leading-relaxed space-y-2 bg-slate-50">
-                  {catatan.map((t, i) => <p key={i}>{t}</p>)}
-                  <p>
-                    Nilai akhir <b>{live.final.toFixed(2)}</b> dengan predikat <b>{live.predicate}</b>
-                    {Object.keys(live.components).length
-                      ? ` (K1: ${live.components.K1?.toFixed(2)}, K2: ${live.components.K2?.toFixed(2)}, K3: ${live.components.K3?.toFixed(2)}, K4: ${live.components.K4?.toFixed(2)})`
-                      : ''}.
-                  </p>
+                  {catatan.map((t, i) => <p key={i} className="text-justify">{t}</p>)}
                 </div>
               </Card>
 

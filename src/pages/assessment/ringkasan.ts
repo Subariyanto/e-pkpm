@@ -12,36 +12,123 @@ import type { Assessment, Indicator } from '../../types';
 export type BarisRingkas = { ind: Indicator; a?: Partial<Assessment> };
 
 /** Narasi Catatan Hasil Penilaian dari skor seluruh indikator. */
-export function catatanHasil(rows: BarisRingkas[]): string[] {
+export type HasilPredikat = { final?: number; predicate?: string; components?: Record<string, number> };
+
+/**
+ * Narasi Catatan Hasil Penilaian — kesimpulan dari skor seluruh indikator,
+ * ditulis sebagai paragraf mengalir. `hasil` opsional (nilai akhir + rincian K1–K4).
+ */
+export function catatanHasil(rows: BarisRingkas[], hasil?: HasilPredikat, pengawas?: string): string[] {
   const dinilai = rows.filter(r => r.a && !r.a.na && r.a.score !== undefined);
   const na = rows.filter(r => r.a?.na);
   const rendah = dinilai.filter(r => (r.a!.score as number) <= 1);
+  const partial = dinilai.filter(r => (r.a!.score as number) === 1);
+  const nol = dinilai.filter(r => (r.a!.score as number) === 0);
   const tinggi = dinilai.filter(r => (r.a!.score as number) === 2);
+  const persen = (n: number) => (dinilai.length ? Math.round((n / dinilai.length) * 100) : 0);
 
   const p: string[] = [];
-  p.push(
-    `Dari ${rows.length} butir instrumen, ${dinilai.length} butir telah dinilai dan ${na.length} butir dinyatakan tidak berlaku (N/A) sesuai jenjang jabatan maupun penugasan pengawas.`,
-  );
-  if (tinggi.length) {
+
+  // Paragraf 1 — cakupan penilaian.
+  if (!dinilai.length) {
     p.push(
-      `Sebanyak ${tinggi.length} butir memperoleh skor 2 (terlaksana lengkap dan sesuai), yaitu: ${tinggi
-        .map(r => r.ind.code)
-        .join(', ')}.`,
+      'Belum ada butir instrumen yang dinilai, sehingga kesimpulan hasil penilaian belum dapat dirumuskan. Seluruh butir perlu diberi skor terlebih dahulu.',
+    );
+    return p;
+  }
+
+  const subjek = pengawas ? `Pengawas ${pengawas}` : 'Pengawas yang dinilai';
+  p.push(
+    `Berdasarkan hasil penilaian kinerja pengawas madrasah terhadap ${subjek}, dari ${rows.length} butir instrumen yang dinilai ${dinilai.length} butir telah diberi skor` +
+    (na.length ? ` dan ${na.length} butir dinyatakan tidak berlaku (N/A) sesuai jenjang jabatan maupun penugasan yang bersangkutan` : '') +
+    '. Seluruh butir tersebut tersebar pada empat komponen penilaian, yaitu penyusunan program pengawasan (K1), pelaksanaan program pengawasan (K2), evaluasi hasil pelaksanaan program pengawasan (K3), serta pembimbingan dan pelatihan profesional pengawas madrasah (K4).',
+  );
+
+  // Paragraf 2 — sebaran skor + kesimpulan kualitas.
+  const sebaran: string[] = [];
+  if (tinggi.length) sebaran.push(`${tinggi.length} butir (${persen(tinggi.length)}%) memperoleh skor 2`);
+  if (partial.length) sebaran.push(`${partial.length} butir (${persen(partial.length)}%) memperoleh skor 1`);
+  if (nol.length) sebaran.push(`${nol.length} butir (${persen(nol.length)}%) memperoleh skor 0`);
+
+  const kalimatSebaran = sebaran.length ? `Skor tersebut terdiri atas ${sebaran.join(', ')}. ` : '';
+  const kualitas = tinggi.length >= dinilai.length * 0.8
+    ? 'Secara umum pelaksanaan tugas kepengawasan sudah terlaksana lengkap dan sesuai ketentuan, dengan hanya sedikit aspek yang masih memerlukan penyempurnaan.'
+    : partial.length + nol.length >= dinilai.length
+      ? 'Seluruh kegiatan telah terlaksana, namun masih terdapat aspek yang belum sepenuhnya didukung bukti dan dokumen yang memadai sehingga memerlukan perbaikan.'
+      : 'Sebagian besar kegiatan telah terlaksana dengan baik, namun beberapa butir masih memerlukan perbaikan agar seluruh tahapan kepengawasan berjalan lengkap dan terdokumentasi.';
+
+  p.push(
+    `${kalimatSebaran}${kualitas} ` +
+    `Kekuatan utama terletak pada aspek ${tinggi.length ? 'yang seluruhnya memperoleh skor 2 sebagaimana tercantum pada daftar butir skor 2' : 'kegiatan yang telah berjalan sesuai rencana'}, sedangkan perhatian utama difokuskan pada ${lowBlokKode(rendah)}.`,
+  );
+
+  // Paragraf 3 — daftar butir berskor 0–1 (narasi, bukan hanya deret kode).
+  if (rendah.length) {
+    const rincian = rendah
+      .map(r => `${r.ind.code} (${ringkas(r.ind)} — skor ${r.a!.score})`)
+      .join('; ');
+    p.push(
+      `Butir yang belum mencapai skor 2 dan menjadi prioritas perbaikan sebanyak ${rendah.length} butir, yaitu: ${rincian}. ` +
+      'Pada butir-butir tersebut, kelengkapan bukti dukung dan dokumen tindak lanjut hasil kegiatan dinilai belum memadai sehingga berpotensi melemahkan keterukuran capaian kepengawasan.',
+    );
+  } else {
+    p.push(
+      'Tidak ditemukan butir dengan skor 0–1. Seluruh kegiatan telah terlaksana lengkap, sesuai ketentuan, serta didukung bukti yang memadai sehingga tidak diperlukan perbaikan mendasar.',
     );
   }
+
+  // Paragraf 4 — tindak lanjut.
   if (rendah.length) {
     p.push(
-      `Sebanyak ${rendah.length} butir memperoleh skor 0–1 sehingga memerlukan perbaikan, yaitu: ${rendah
-        .map(r => `${r.ind.code} (skor ${r.a!.score})`)
-        .join(', ')}.`,
+      `Sebagai tindak lanjut, kepada pengawas yang dinilai diharapkan menyusun rencana perbaikan pada ${rendah.length} butir tersebut melalui kegiatan pengembangan keprofesian berkelanjutan, melengkapi bukti dukung dan dokumen tindak lanjut hasil kegiatan, serta menyampaikan hasilnya untuk diverifikasi pada periode penilaian berikutnya.`,
     );
-  } else if (dinilai.length) {
-    p.push('Tidak ditemukan butir dengan skor 0–1; seluruh kegiatan terlaksana lengkap dan sesuai.');
+  } else if (na.length) {
+    p.push(
+      'Rekomendasi diarahkan pada pemeliharaan dan penguatan mutu kinerja yang telah tercapai, disertai penyesuaian kejelasan penugasan pada butir yang dinyatakan tidak berlaku (N/A).',
+    );
+  } else {
+    p.push(
+      'Rekomendasi diarahkan pada pemeliharaan dan penguatan mutu kinerja yang telah tercapai agar capaian baik ini tetap konsisten pada periode penilaian berikutnya.',
+    );
   }
-  if (na.length) {
-    p.push(`Butir N/A: ${na.map(r => r.ind.code).join(', ')}.`);
+
+  // Paragraf 5 — simpulan akhir + predikat.
+  if (typeof hasil?.final === 'number') {
+    const komp: string[] = [];
+    for (const k of ['K1', 'K2', 'K3', 'K4']) {
+      const v = hasil.components?.[k];
+      if (typeof v === 'number') komp.push(`${k} sebesar ${v.toFixed(2)}`);
+    }
+    p.push(
+      `Dengan demikian, nilai akhir kinerja ${subjek} adalah ${hasil.final.toFixed(2)} dengan predikat ${hasil.predicate || '-'}` +
+      (komp.length ? `, yang diperoleh dari rata-rata capaian ${komp.join(', ')}` : '') +
+      `. Predikat ini menjadi simpulan akhir penilaian kinerja pengawas madrasah untuk periode penilaian yang bersangkutan.`,
+    );
   }
+
   return p;
+}
+
+export function angkaPersenSkor2(rows: BarisRingkas[]) {
+  const dinilai = rows.filter(r => r.a && !r.a.na && r.a.score !== undefined);
+  const tinggi = dinilai.filter(r => (r.a!.score as number) === 2);
+  return dinilai.length ? Math.round((tinggi.length / dinilai.length) * 100) : 0;
+}
+
+/** "K1.3, K1.6, dan K2.3" — daftar kode berurutan gaya bahasa Indonesia. */
+function lowBlokKode(rendah: BarisRingkas[]) {
+  const codes = rendah.map(r => r.ind.code);
+  if (!codes.length) return 'pemeliharaan mutu kinerja yang telah tercapai';
+  if (codes.length === 1) return `butir ${codes[0]}`;
+  return `butir ${codes.slice(0, -1).join(', ')}, dan ${codes.at(-1)}`;
+}
+
+/** Potongan judul indikator agar kalimat tetap terbaca (maks ~10 kata). */
+function ringkas(ind: Indicator) {
+  const teks = (ind.title || ind.description || '').replace(/\s+/g, ' ').trim();
+  if (!teks) return 'butir instrumen';
+  const kata = teks.split(' ');
+  return kata.length <= 10 ? teks : `${kata.slice(0, 10).join(' ')}...`;
 }
 
 export type ItemRtl = {

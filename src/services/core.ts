@@ -193,7 +193,8 @@ export function validateFinalization(items: Assessment[], master: Indicator[]): 
     }
     if (a.score === undefined) { if (ind.required) errors.push(`${ind.code}: belum diberi skor`); continue; }
     if ((a.score === 0 || a.score === 1) && !a.notes.trim()) errors.push(`${ind.code}: skor ${a.score} wajib memiliki catatan`);
-    if ((a.score === 0 || a.score === 1) && !a.rtlMasalah.trim() && !a.rtlTindakan.trim()) errors.push(`${ind.code}: skor ${a.score} wajib memiliki RTL`);
+    // RTL kini disusun sekali di akhir instrumen (langkah "Catatan Hasil & RTL"),
+    // terhitung otomatis dari skor seluruh komponen — tidak lagi diwajibkan per butir.
   }
   return errors;
 }

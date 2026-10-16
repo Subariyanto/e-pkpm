@@ -16,65 +16,13 @@ import { Button, Card, PageTitle, TABLE_CELL } from '../../components/Layout';
 import { calculate, indicatorsForJenjang, instrumenAktif } from '../../services/core';
 import { AUTO_ISI } from '../../data/demo';
 import { emptyAssessment, COMP_KEYS } from './helpers';
+import { catatanHasil, rekapRTL } from './ringkasan';
 import { nilaiKomponen } from './IndicatorList';
 import type { Assessment, Indicator } from '../../types';
 import { Printer, ArrowLeft, Eye } from 'lucide-react';
 
 type Profil = { nama?: string; nip?: string; jabatan?: string; unit?: string; kabupaten?: string; kop?: string[] };
 type Org = { name?: string; district?: string; chairman?: string; period?: string; address?: string; phone?: string; email?: string };
-
-/** Ringkasan Catatan Hasil Penilaian dari skor seluruh indikator. */
-function catatanHasil(rows: { ind: Indicator; a?: Partial<Assessment> }[]) {
-  const dinilai = rows.filter(r => r.a && !r.a.na && r.a.score !== undefined);
-  const na = rows.filter(r => r.a?.na);
-  const rendah = dinilai.filter(r => (r.a!.score as number) <= 1);
-  const tinggi = dinilai.filter(r => (r.a!.score as number) === 2);
-
-  const p: string[] = [];
-  p.push(
-    `Dari ${rows.length} butir instrumen, ${dinilai.length} butir telah dinilai dan ${na.length} butir dinyatakan tidak berlaku (N/A) sesuai jenjang jabatan maupun penugasan pengawas.`,
-  );
-  if (tinggi.length) {
-    p.push(
-      `Sebanyak ${tinggi.length} butir memperoleh skor 2 (terlaksana lengkap dan sesuai), yaitu: ${tinggi
-        .map(r => r.ind.code)
-        .join(', ')}.`,
-    );
-  }
-  if (rendah.length) {
-    p.push(
-      `Sebanyak ${rendah.length} butir memperoleh skor 0–1 sehingga memerlukan perbaikan, yaitu: ${rendah
-        .map(r => `${r.ind.code} (skor ${r.a!.score})`)
-        .join(', ')}.`,
-    );
-  } else if (dinilai.length) {
-    p.push('Tidak ditemukan butir dengan skor 0–1; seluruh kegiatan terlaksana lengkap dan sesuai.');
-  }
-  if (na.length) {
-    p.push(`Butir N/A: ${na.map(r => r.ind.code).join(', ')}.`);
-  }
-  return p;
-}
-
-/** Ringkasan Rencana Tindak Lanjut dari skor seluruh indikator. */
-function rekapRTL(rows: { ind: Indicator; a?: Partial<Assessment> }[]) {
-  const items = rows
-    .filter(r => r.a && !r.a.na && r.a.score !== undefined && (r.a.score as number) <= 1)
-    .sort((x, y) => (x.a!.score as number) - (y.a!.score as number));
-  return items.map(r => {
-    const auto = AUTO_ISI[r.a!.score as number];
-    return {
-      code: r.ind.code,
-      title: r.ind.title || r.ind.description || '',
-      score: r.a!.score as number,
-      masalah: r.a!.rtlMasalah || (auto ? auto.rtlMasalah : '') || '-',
-      tindakan: r.a!.rtlTindakan || (auto ? auto.rtlTindakan : '') || '-',
-      produk: r.a!.rtlProduk || (auto ? auto.rtlProduk : '') || '-',
-      bentukPKB: r.a!.rtlBentukPKB || (auto ? auto.rtlBentukPKB : '') || '-',
-      status: r.a!.rtlStatus || (auto ? auto.rtlStatus : '') || '-',
-    };
-  });
-}
 
 export function CetakInstrumenPage() {
   const ps = useLiveQuery(() => db.supervisors.toArray(), []) || [];
@@ -130,7 +78,10 @@ export function CetakInstrumenPage() {
 
   const dinilai = baris.filter(r => r.a && !r.a.na && r.a.score !== undefined);
   const belum = baris.length - dinilai.length;
-  const catatan = useMemo(() => catatanHasil(baris), [baris]);
+  const catatan = useMemo(
+    () => catatanHasil(baris, hitung, supervisor?.name),
+    [baris, hitung, supervisor?.name],
+  );
   const rtl = useMemo(() => rekapRTL(baris), [baris]);
   const profil = (profilSetting?.value || {}) as Profil;
   const org = (orgSetting || {}) as Org;
