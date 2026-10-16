@@ -106,17 +106,32 @@ export function MyProfilePage() {
     setInfo('Profil penilai dan kop surat tersimpan di perangkat ini.');
   }
 
-  /** Simpan data pejabat penandatangan ke tabel org. */
+  /** Simpan data pejabat penandatangan ke tabel org (dibuat bila belum ada). */
   async function simpanPejabat() {
-    if (!orgRow) return setInfo('Data organisasi belum tersedia.');
-    const ketua = (ketuaPokjawas || orgRow.chairman || '').trim();
-    const kantor = (kepalaKantor || orgRow.headOffice || '').trim();
-    const nipK = (nipKetua || (orgRow as any).nipChairman || '').trim();
-    const nipKn = (nipKantor || (orgRow as any).nipHeadOffice || '').trim();
-    await db.org.update(orgRow.id, {
-      chairman: ketua, headOffice: kantor,
-      nipChairman: nipK, nipHeadOffice: nipKn,
-    } as any);
+    const ketua = (ketuaPokjawas || orgRow?.chairman || '').trim();
+    const kantor = (kepalaKantor || orgRow?.headOffice || '').trim();
+    const nipK = (nipKetua || (orgRow as any)?.nipChairman || '').trim();
+    const nipKn = (nipKantor || (orgRow as any)?.nipHeadOffice || '').trim();
+    if (!ketua && !kantor) return setInfo('Isi minimal salah satu nama pejabat penandatangan.');
+    if (nipK && !/^\d{18}$/.test(nipK)) return setInfo('NIP Ketua Pokjawas wajib 18 digit angka (boleh dikosongkan).');
+    if (nipKn && !/^\d{18}$/.test(nipKn)) return setInfo('NIP Kepala Kantor wajib 18 digit angka (boleh dikosongkan).');
+
+    if (orgRow) {
+      await db.org.update(orgRow.id, {
+        chairman: ketua, headOffice: kantor,
+        nipChairman: nipK, nipHeadOffice: nipKn,
+      } as any);
+    } else {
+      // Perangkat ini belum punya baris organisasi — buat baru agar data pejabat
+      // tidak hilang. Nilai identitas lain memakai bawaan yang aman.
+      await db.org.add({
+        id: 'ORG-JEMBER', name: 'Pokjawas Madrasah Kabupaten Jember',
+        district: 'Kabupaten Jember', province: 'Jawa Timur',
+        chairman: ketua, headOffice: kantor,
+        address: '', phone: '', email: '', period: '2026',
+        nipChairman: nipK, nipHeadOffice: nipKn,
+      } as any);
+    }
     await audit('PEJABAT_TTD', 'Penandatangan', { ketua, kantor });
     setKetuaPokjawas(''); setNipKetua(''); setKepalaKantor(''); setNipKantor('');
     setInfo('Nama dan NIP pejabat penandatangan tersimpan.');
