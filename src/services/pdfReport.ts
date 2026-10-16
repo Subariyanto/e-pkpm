@@ -202,8 +202,12 @@ function renderIndividual(
     doc.setTextColor(0, 0, 0);
 
     const hdr = ['No', 'Indikator', 'Dok', 'Skor', 'Kriteria Penilaian', 'Catatan'];
-    const w = [7, 62, 10, 42, 43];
-    w[2] = innerW - w[0] - w[1] - w[4] - w[3];
+    // Lebar kolom dikunci eksplisit supaya penjumlahan tepat = lebar dalam
+    // halaman. Tidak ada kolom yang "kebagian sisa", jadi tidak ada teks
+    // yang terpotong tepi kanan.
+    const w = [8, 58, 11, 12, 56, 45];
+    const totalW = w.reduce((a, b) => a + b, 0);
+    w[1] += innerW - totalW;
     const skorCol = margin + w[0] + w[1];
     const dokCol = skorCol + w[2];
     const kritCol = dokCol + w[3];
@@ -212,12 +216,12 @@ function renderIndividual(
     doc.setFillColor(226, 232, 240);
     doc.rect(margin, y, innerW, 6, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
+    doc.setFontSize(6.8);
     let hx = margin;
     for (const [hi, h] of hdr.entries()) {
-      // "Skor" dirapatkan ke tengah kolomnya agar tidak mentok garis pemisah.
-      const pos = hi === 3 ? hx + w[hi] / 2 : hx + 1.5;
-      doc.text(h, pos, y + 4.2, hi === 3 ? { align: 'center' } : undefined);
+      // Judul kolom angka (Dok & Skor) rata tengah kolomnya.
+      const tengah = hi === 2 || hi === 3;
+      doc.text(h, tengah ? hx + w[hi] / 2 : hx + 1.2, y + 4.0, tengah ? { align: 'center' } : undefined);
       hx += w[hi];
     }
     y += 6;
@@ -248,7 +252,7 @@ function renderIndividual(
       const txtKriteria = doc.splitTextToSize(krit, w[4] - 3);
       const txtCatatan = doc.splitTextToSize(cat, w[3] - 3);
       const baris = Math.max(txtIndikator.length, txtKriteria.length, txtCatatan.length, 1);
-      const hBaris = baris * 3.4 + 2.4;
+      const hBaris = baris * 3.3 + 2.6;
 
       if (y + hBaris > 282) { doc.addPage(); y = 20; }
 
@@ -259,10 +263,10 @@ function renderIndividual(
       doc.line(kritCol, y, kritCol, y + hBaris);
       doc.line(catCol, y, catCol, y + hBaris);
 
-      doc.setFontSize(7.5);
-      doc.text(String(n + 1), margin + 1.5, y + 3.6);
+      doc.setFontSize(7);
+      doc.text(String(n + 1), margin + 2, y + 3.6, { align: 'center' });
       doc.text(txtIndikator, margin + w[0] + 1.5, y + 3.6);
-      doc.text(dok, dokCol + 2.5, y + 3.6);
+      doc.text(dok, dokCol + w[2] / 2, y + 3.6, { align: 'center' });
       const skor = isNA ? 'N/A' : String(score ?? '-');
       doc.setFont('helvetica', isNA ? 'normal' : 'bold');
       doc.text(skor, skorCol + w[2] / 2, y + 3.6, { align: 'center' });
