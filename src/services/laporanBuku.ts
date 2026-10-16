@@ -618,10 +618,7 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
   doc.text('HALAMAN PENGESAHAN', 105, y, { align: 'center' });
-  y += 4;
-  doc.setLineWidth(0.6);
-  doc.line(70, y, 140, y);
-  y += 14;
+  y += 16;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
   y = tulisParagraf(
@@ -682,9 +679,7 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
   doc.text('KATA PENGANTAR', 105, y, { align: 'center' });
-  y += 4;
-  doc.line(70, y, 140, y);
-  y += 14;
+  y += 16;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
   y = tulisParagraf(
@@ -735,10 +730,7 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
     doc.text(`BAB ${bab.no}`, 105, yy, { align: 'center' });
     yy += 6;
     doc.text(bab.judul, 105, yy, { align: 'center' });
-    yy += 3.5;
-    doc.setLineWidth(0.6);
-    doc.line(75, yy, 135, yy);
-    yy += 12;
+    yy += 14;
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(11);
@@ -795,10 +787,7 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
   yL += 6;
   doc.setFontSize(11);
   doc.text('REKAP HASIL PENILAIAN KINERJA PENGAWAS MADRASAH', 105, yL, { align: 'center' });
-  yL += 4;
-  doc.setLineWidth(0.6);
-  doc.line(40, yL, 170, yL);
-  yL += 10;
+  yL += 12;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.text(`Periode ${periode} · ${namaOrganisasi} · ${kabupaten}`, 105, yL, { align: 'center' });
@@ -883,10 +872,7 @@ export async function generateBukuLaporan(opsi: OpsiLaporan): Promise<Blob> {
   doc.setFontSize(14);
   doc.setTextColor(0, 0, 0);
   doc.text('DAFTAR ISI', 105, yd, { align: 'center' });
-  yd += 4;
-  doc.setLineWidth(0.6);
-  doc.line(78, yd, 132, yd);
-  yd += 14;
+  yd += 16;
 
   const barisDaftar: Array<{ label: string; hal: number; tebal?: boolean }> = [
     { label: 'Halaman Judul (Cover)', hal: 1 },
