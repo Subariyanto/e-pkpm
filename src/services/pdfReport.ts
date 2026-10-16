@@ -587,3 +587,139 @@ export function downloadBlob(blob: Blob, filename: string) {
   a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
 }
+
+/** Satu baris prioritas PKB yang siap dicetak. */
+export interface PrioritasCetak {
+  peringkat: number;
+  code: string;
+  title: string;
+  rataRata: number;
+  jumlahDinilai: number;
+  jumlahLemah: number;
+  capaianPersen: number;
+  pkb: string;
+}
+
+/**
+ * PDF khusus "Prioritas PKB Kabupaten" — satu berkas berisi tabel prioritas
+ * beserta rekomendasi pengembangan keprofesian, siap dicetak atau disimpan.
+ *
+ * @param prioritas daftar prioritas terurut dari rata-rata skor terendah
+ * @param org data organisasi untuk kop surat
+ * @param opsi judul periode dan catatan sumber data
+ */
+export async function generatePrioritasPkbPdf(
+  prioritas: PrioritasCetak[],
+  org: OrgLike,
+  opsi: { periode?: string; jumlahPengawas?: number; sumber?: string } = {},
+): Promise<Blob> {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const margin = 15;
+  const innerW = 180;
+  let y = kopSurat(doc, org);
+
+  doc.setProperties({
+    title: `Prioritas PKB Kabupaten ${opsi.periode || ''}`.trim(),
+    subject: 'Prioritas Pengembangan Keprofesian Berkelanjutan',
+    author: bersih(org.chairman) || 'Pokjawas Madrasah',
+    creator: 'e-PKPM',
+  });
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text('PRIORITAS PENGEMBANGAN KEPROFESIAN BERKELANJUTAN', 105, y, { align: 'center' });
+  y += 5.5;
+  doc.setFontSize(10);
+  doc.text('PENGAWAS MADRASAH KABUPATEN', 105, y, { align: 'center' });
+  y += 5;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  const keterangan = [
+    `Periode ${opsi.periode || org.period || '2026'}`,
+    opsi.jumlahPengawas ? `${opsi.jumlahPengawas} pengawas dinilai` : '',
+  ].filter(Boolean).join(' · ');
+  if (keterangan) {
+    doc.text(keterangan, 105, y, { align: 'center' });
+    y += 5;
+  }
+  y += 4;
+
+  // Tabel prioritas
+  const w = [10, 20, 62, 18, 20, 50];
+  const totalW = w.reduce((a, b) => a + b, 0);
+  w[2] += innerW - totalW;
+  const col = (i: number) => margin + w.slice(0, i).reduce((a, b) => a + b, 0);
+  const hdr = ['No', 'Kode', 'Indikator', 'Rata-rata', 'Capaian', 'Rekomendasi PKB'];
+
+  doc.setFillColor(23, 63, 112);
+  doc.setTextColor(255, 255, 255);
+  doc.rect(margin, y, innerW, 7, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  for (const [hi, h] of hdr.entries()) {
+    const tengah = hi === 3 || hi === 4;
+    doc.text(h, tengah ? col(hi) + w[hi] / 2 : col(hi) + 1.5, y + 4.6, tengah ? { align: 'center' } : undefined);
+  }
+  y += 7;
+
+  doc.setTextColor(0, 0, 0);
+  doc.setFont('helvetica', 'normal');
+  for (const p of prioritas) {
+    const txtJudul = doc.splitTextToSize(bersih(p.title) || '-', w[2] - 3);
+    const txtPkb = doc.splitTextToSize(bersih(p.pkb) || '-', w[5] - 3);
+    const baris = Math.max(txtJudul.length, txtPkb.length, 1);
+    const tinggi = baris * 4.2 + 3;
+
+    if (y + tinggi > 268) {
+      doc.addPage();
+      y = 20;
+    }
+
+    doc.setDrawColor(203, 213, 225);
+    doc.rect(margin, y, innerW, tinggi);
+    for (const x of [col(1), col(2), col(3), col(4), col(5)]) {
+      doc.line(x, y, x, y + tinggi);
+    }
+
+    doc.setFontSize(8);
+    doc.text(String(p.peringkat), col(0) + 1.5, y + 4.5);
+    doc.text(bersih(p.code) || '-', col(1) + 1.5, y + 4.5);
+    doc.text(txtJudul, col(2) + 1.5, y + 4.5);
+    doc.text(`${p.rataRata.toFixed(2)} / 2.00`, col(3) + w[3] / 2, y + 4.5, { align: 'center' });
+    doc.text(`${p.capaianPersen.toFixed(1)}%`, col(4) + w[4] / 2, y + 4.5, { align: 'center' });
+    doc.setFontSize(7);
+    doc.text(txtPkb, col(5) + 1.5, y + 4.5);
+    doc.setFontSize(8);
+    y += tinggi;
+  }
+
+  if (!prioritas.length) {
+    doc.setFontSize(9);
+    doc.text('Belum ada butir instrumen baku yang memiliki skor penilaian.', margin, y + 6);
+    y += 12;
+  }
+
+  // Catatan metode + tanda tangan
+  y += 5;
+  if (y > 250) { doc.addPage(); y = 20; }
+  doc.setFontSize(8);
+  doc.setTextColor(90, 90, 90);
+  const catatan = bersih(opsi.sumber) ||
+    'Prioritas disusun dari rata-rata skor terendah pada butir instrumen baku PKPM. Semakin rendah capaian, semakin mendesak kebutuhan pengembangan keprofesian.';
+  const wrapCat = doc.splitTextToSize(`Catatan: ${catatan}`, innerW);
+  doc.text(wrapCat, margin, y);
+  y += wrapCat.length * 4 + 6;
+  doc.setTextColor(0, 0, 0);
+
+  if (y > 245) { doc.addPage(); y = 20; }
+  const kota = bersih(org.district).replace(/^kabupaten\s+/i, '') || 'Jember';
+  tandaTangan(doc, org, kota, y + 4);
+  y += 42;
+
+  doc.setFontSize(7);
+  doc.setTextColor(100, 100, 100);
+  if (y > 285) { doc.addPage(); y = 20; }
+  doc.text('Dokumen ini diterbitkan melalui e-PKPM · pkpm.pokjawasjember.com', margin, y);
+
+  return doc.output('blob');
+}
