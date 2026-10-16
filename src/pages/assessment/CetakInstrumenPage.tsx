@@ -18,7 +18,7 @@ import { AUTO_ISI } from '../../data/demo';
 import { emptyAssessment, COMP_KEYS } from './helpers';
 import { nilaiKomponen } from './IndicatorList';
 import type { Assessment, Indicator } from '../../types';
-import { Printer } from 'lucide-react';
+import { Printer, ArrowLeft, Eye } from 'lucide-react';
 
 type Profil = { nama?: string; nip?: string; jabatan?: string; unit?: string; kabupaten?: string; kop?: string[] };
 type Org = { name?: string; district?: string; chairman?: string; period?: string; address?: string; phone?: string; email?: string };
@@ -83,6 +83,7 @@ export function CetakInstrumenPage() {
   const orgSetting = useLiveQuery(() => db.org.toCollection().first(), []);
 
   const [pid, setPid] = useState('');
+  const [pratinjau, setPratinjau] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [skNumber, setSkNumber] = useState('');
   const [skDate, setSkDate] = useState('');
@@ -152,13 +153,22 @@ export function CetakInstrumenPage() {
   const tanggalCetak = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
-    <>
-      {/* ===== Panel kontrol (tidak ikut tercetak) ===== */}
+    <div className={pratinjau ? 'pratinjau' : undefined}>
+      {/* ===== Panel kontrol (tidak ikut tercetak; tersembunyi di mode pratinjau) ===== */}
       <div className="print:hidden">
         <PageTitle
           title="Cetak Instrumen"
           desc="Dokumen instrumen penilaian siap cetak — lengkap dengan catatan hasil, rencana tindak lanjut, dan kolom tanda tangan"
-          action={<Button onClick={() => window.print()} disabled={!pid}><Printer size={16} className="inline" /> Cetak / Simpan PDF</Button>}
+          action={
+            <div className="flex flex-wrap gap-2 print:hidden">
+              <Button variant="light" onClick={() => setPratinjau(true)} disabled={!pid}>
+                <Eye size={16} className="inline" /> Pratinjau
+              </Button>
+              <Button onClick={() => window.print()} disabled={!pid}>
+                <Printer size={16} className="inline" /> Cetak / Simpan PDF
+              </Button>
+            </div>
+          }
         />
 
         <Card>
@@ -192,13 +202,25 @@ export function CetakInstrumenPage() {
         </Card>
 
         <p className="text-xs text-slate-500 mt-3">
-          Gunakan pilihan “Simpan sebagai PDF” pada dialog cetak. Ukuran kertas A4, margin default.
+          Gunakan <b>Pratinjau</b> untuk melihat lembar A4 di layar (bisa digulir), lalu tombol
+          “Cetak / Simpan PDF” untuk mencetak. Ukuran kertas A4, margin default.
         </p>
       </div>
 
+      {/* ===== Mode pratinjau: panel kontrol ditutup, dokumen tampil sebagai lembar A4 ===== */}
+      {pratinjau && (
+        <div className="bilah print:hidden">
+          <Printer size={15} />
+          <b className="text-sm">Pratinjau Cetak</b>
+          <button onClick={() => window.print()}><Printer size={14} /> Cetak / Simpan PDF</button>
+          <button className="ringan" onClick={() => setPratinjau(false)}><ArrowLeft size={14} /> Kembali</button>
+          <span>Ukuran A4 · margin default</span>
+        </div>
+      )}
+
       {/* ===== Lembar cetak ===== */}
       {pid && (
-        <div id="cetak-instrumen" className="print-area bg-white text-slate-900 mt-6 print:mt-0">
+        <div id="cetak-instrumen" className="print-area bg-white text-slate-900 mt-6 print:mt-0 print:shadow-none print:rounded-none">
           {/* Kop — empat baris dari menu Profil Penilai & Sasaran */}
           <div className="text-center border-b-4 border-double border-slate-800 pb-3 mb-4">
             {kop.map((baris, i) => (
@@ -399,6 +421,6 @@ export function CetakInstrumenPage() {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

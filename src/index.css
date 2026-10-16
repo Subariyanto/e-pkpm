@@ -1,1 +1,31 @@
-@tailwind base;@tailwind components;@tailwind utilities;@layer base{body{@apply antialiased}label{@apply block text-sm font-medium mb-1}}@layer components{.input{@apply w-full border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-300 focus:outline-none}.tab-scroll{scrollbar-width:thin;scrollbar-color:#cbd5e1 transparent}.tab-scroll::-webkit-scrollbar{height:4px}.tab-scroll::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:9999px}.tab-scroll::-webkit-scrollbar-track{background:transparent}.badge{@apply bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full}.dark body{@apply bg-slate-900 text-slate-100}.dark .bg-white{@apply bg-slate-800}.dark .text-slate-800{@apply text-slate-100}}.sidebar-scroll{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.28) transparent}.sidebar-scroll::-webkit-scrollbar{width:6px}.sidebar-scroll::-webkit-scrollbar-track{background:transparent}.sidebar-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25);border-radius:9999px}.sidebar-scroll::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.4)}.sidebar-scroll:hover{scrollbar-color:rgba(255,255,255,.45) transparent}@media print{@page{size:A4;margin:12mm}html,body{overflow:visible!important;height:auto!important;background:#fff!important}.print\:hidden{display:none!important}#root,.h-screen{height:auto!important;overflow:visible!important}main{overflow:visible!important;padding:0!important}aside,footer,header{display:none!important}.lg\:ml-60{margin-left:0!important}.print-area{font-size:10px}.avoid-break{break-inside:avoid;page-break-inside:avoid}.print-area table{width:100%}.print-area .h-24{height:22mm!important}}
+@tailwind base;@tailwind components;@tailwind utilities;@layer base{body{@apply antialiased}label{@apply block text-sm font-medium mb-1}}@layer components{.input{@apply w-full border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-300 focus:outline-none}.tab-scroll{scrollbar-width:thin;scrollbar-color:#cbd5e1 transparent}.tab-scroll::-webkit-scrollbar{height:4px}.tab-scroll::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:9999px}.tab-scroll::-webkit-scrollbar-track{background:transparent}.badge{@apply bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full}.dark body{@apply bg-slate-900 text-slate-100}.dark .bg-white{@apply bg-slate-800}.dark .text-slate-800{@apply text-slate-100}}.sidebar-scroll{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.28) transparent}.sidebar-scroll::-webkit-scrollbar{width:6px}.sidebar-scroll::-webkit-scrollbar-track{background:transparent}.sidebar-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25);border-radius:9999px}.sidebar-scroll::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.4)}.sidebar-scroll:hover{scrollbar-color:rgba(255,255,255,.45) transparent}/* ===== Cetak Instrumen: mode pratinjau di layar =====
+   Panel kontrol disembunyikan saat mode pratinjau, isi halaman dibuat rata tengah
+   agar tampak seperti kertas A4 di atas meja, bukan tersembul dari container. */
+.pratinjau .print\:hidden{display:none!important}
+.pratinjau .bilah{position:sticky;top:0;z-index:50;background:#102a4c;color:#fff;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;padding:.5rem .75rem;margin:0 0 1rem;border-radius:.5rem}
+.pratinjau .bilah button{display:inline-flex;align-items:center;gap:.35rem;font-size:.8rem;padding:.4rem .7rem;border-radius:.4rem;background:#1d4ed8;color:#fff}
+.pratinjau .bilah button.ringan{background:rgba(255,255,255,.14)}
+.pratinjau .bilah span{font-size:.75rem;color:#bfdbfe;margin-left:auto}
+.pratinjau #cetak-instrumen{width:210mm;max-width:100%;margin:0 auto 3rem;padding:12mm;box-shadow:0 2px 14px rgba(15,23,42,.22);border-radius:2px}
+
+@media print{
+@page{size:A4;margin:12mm}
+html,body{overflow:visible!important;height:auto!important;background:#fff!important}
+.print\:hidden{display:none!important}
+/* Seluruh pembungkus dilepas: tanpa ini cetakan terpotong tepat di tinggi layar,
+   sehingga pergantian halaman jadi nanggung dan isi setelah halaman pertama hilang. */
+html,body,#root{height:auto!important;min-height:0!important;overflow:visible!important;display:block!important}
+.h-dvh,.h-screen{height:auto!important;min-height:0!important;overflow:visible!important;display:block!important}
+main,.sidebar-scroll{overflow:visible!important;height:auto!important;min-height:0!important;flex:none!important}
+main{padding:0!important;display:block!important}
+main>div{padding:0!important;margin:0!important;max-width:none!important}
+aside,footer,header{display:none!important}
+.bilah{display:none!important}
+.lg\:ml-60{margin-left:0!important}
+.print-area{font-size:10px}
+.pratinjau #cetak-instrumen{width:auto!important;max-width:none!important;margin:0!important;padding:0!important;box-shadow:none!important;border-radius:0!important}
+.avoid-break{break-inside:avoid;page-break-inside:avoid}
+.print-area table{width:100%}
+.print-area tr,.print-area thead,.print-area tbody{break-inside:avoid}
+.print-area .h-24{height:22mm!important}
+}
