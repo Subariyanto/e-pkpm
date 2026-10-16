@@ -6,6 +6,12 @@ export type RtlStatus='belum'|'proses'|'selesai';
 export type Jenjang=Level;
 export interface Org {id:string;name:string;district:string;province:string;chairman:string;headOffice:string;address:string;phone:string;email:string;period:string}
 export interface User {id:string;name:string;username:string;pinHash:string;roles:Role[];nip:string;active:boolean;failed:number;lockedUntil?:number;
+ /** Pangkat/golongan ruang, mis. "Pembina / IV a". */
+ rank?:string;
+ /** Jabatan, mis. "Pengawas Madrasah". */
+ position?:string;
+ /** Jenjang jabatan pengawas. */
+ level?:string;
  /** Kode aktivasi yang mengikat akun ini (Opsi A: 1 kode = 1 akun, data lokal). */
  activationCode?:string;
  /** Nama perangkat tempat akun pertama kali diaktivasi. */

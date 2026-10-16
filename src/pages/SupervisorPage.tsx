@@ -26,6 +26,16 @@ const KOSONG: Form = {
 
 const LEVEL = ['Muda', 'Madya', 'Utama'];
 
+/** Pilihan pangkat/golongan ruang PNS sesuai PMA/PP, golongan I–IV. */
+export const PANGKAT_GOL = [
+  'Juru Muda / I a', 'Juru Muda Tk. I / I b', 'Juru / I c', 'Juru Tk. I / I d',
+  'Pengatur Muda / II a', 'Pengatur Muda Tk. I / II b', 'Pengatur / II c', 'Pengatur Tk. I / II d',
+  'Penata Muda / III a', 'Penata Muda Tk. I / III b', 'Penata / III c', 'Penata Tk. I / III d',
+  'Pembina / IV a', 'Pembina Tk. I / IV b', 'Pembina Utama Muda / IV c',
+  'Pembina Utama Madya / IV d', 'Pembina Utama / IV e',
+  'PPPK Ahli Pertama / IX', 'PPPK Ahli Muda / X', 'PPPK Ahli Madya / XI',
+];
+
 export function SupervisorPage() {
   const data = useLiveQuery(() => db.supervisors.toArray(), []) || [];
   const users = useLiveQuery(() => db.users.toArray(), []) || [];
@@ -193,9 +203,12 @@ export function SupervisorPage() {
               </select>
             </label>
             <label className="text-sm">Pangkat / Golongan
-              <input className="input mt-1" value={form.rank}
-                onChange={e => setForm({ ...form, rank: e.target.value })}
-                placeholder="Contoh: Pembina / IV a" />
+              <select className="input mt-1" value={form.rank}
+                onChange={e => setForm({ ...form, rank: e.target.value })}>
+                <option value="">— Pilih pangkat / golongan —</option>
+                {PANGKAT_GOL.map(x => <option key={x} value={x}>{x}</option>)}
+                {form.rank && !PANGKAT_GOL.includes(form.rank) && <option value={form.rank}>{form.rank} (data lama)</option>}
+              </select>
             </label>
             <label className="text-sm md:col-span-2">Unit Kerja
               <input className="input mt-1" value={form.workUnit}
@@ -257,7 +270,7 @@ export function SupervisorPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-100">
-                  {['Nama', 'NIP', 'Jabatan', 'Jenjang', 'Wilayah', 'Penilai', 'Status', 'Aksi'].map(h => (
+                  {['Nama', 'NIP', 'Jabatan', 'Jenjang', 'Pangkat / Gol', 'Wilayah', 'Penilai', 'Status', 'Aksi'].map(h => (
                     <th key={h} className="p-3 text-left whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -269,6 +282,7 @@ export function SupervisorPage() {
                     <td className="p-3 whitespace-nowrap">{x.nip}</td>
                     <td className="p-3">{x.position || '-'}</td>
                     <td className="p-3">{x.level || '-'}</td>
+                    <td className="p-3 whitespace-nowrap">{x.rank || '-'}</td>
                     <td className="p-3">{x.region || '-'}</td>
                     <td className="p-3">{users.find(u => u.id === x.assessorId)?.name || <span className="text-slate-400">Belum dibagi</span>}</td>
                     <td className="p-3">
