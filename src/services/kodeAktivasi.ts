@@ -102,6 +102,11 @@ function siapkan(cfg?: FirebaseConfig) {
 
 export function auth() { return siapkan().auth; }
 
+/** Apakah konfigurasi Firebase sudah ada di perangkat ini. */
+export function konfigAda(): boolean {
+  try { return !!konfigAktif(); } catch { return false; }
+}
+
 /* ------------------------------------------------------------------ */
 /* Generator & pemformat kode                                         */
 /* ------------------------------------------------------------------ */

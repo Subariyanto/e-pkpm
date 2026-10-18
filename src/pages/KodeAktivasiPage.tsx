@@ -12,7 +12,7 @@ import {
   adminLogin,
   pesanAlasan,
   type KodeLisensi,
-} from '../services/pusatLisensi';
+} from '../services/lisensiFirebase';
 import { KeyRound, Plus, Trash2, Copy, Ban, RotateCcw, RefreshCw, Download, Check } from 'lucide-react';
 
 const KEY_STORE = 'pkpm_pusat_admin_key';

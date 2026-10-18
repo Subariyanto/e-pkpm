@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { activationState } from '../services/activation';
 import { seedDemo } from '../services/core';
-import { registerAccount, loginAccount, adminLogin, pusatOnline, pesanAlasan } from '../services/pusatLisensi';
+import { registerAccount, loginAccount, adminLogin, pusatOnline, pesanAlasan } from '../services/lisensiFirebase';
 import { db } from '../lib/db';
 import { sha256 } from '../services/core';
 import { KeyRound, ShieldCheck, UserPlus, LogIn } from 'lucide-react';
