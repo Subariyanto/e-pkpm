@@ -1,0 +1,194 @@
+rules_version = '2';
+
+/**
+ * Firestore Security Rules — e-PKPM
+ *
+ * Struktur yang dipakai aplikasi:
+ *   /{koleksi}/items/data/{docId}   → data operasional
+ *   /akun/items/data/{uid}          → profil akun
+ *   /admin/items/data/{uid}         → penanda akun admin kabupaten
+ *   /kodeAktivasi/items/data/{KODE} → kode aktivasi
+ *
+ * Prinsip:
+ *   - Semua baca/tulis data penilaian butuh login + profil aktif.
+ *   - Penulisan akun, kode aktivasi, dan data master hanya lewat Cloud
+ *     Function (Admin SDK) — klien tidak boleh menulis langsung.
+ *   - Satu-satunya penulisan dari klien: dokumen profil milik sendiri,
+ *     dan hanya saat dokumen belum ada (pendaftaran akun baru).
+ *
+ * Pasang: Firebase Console → Firestore → Rules, atau
+ *         `firebase deploy --only firestore:rules`.
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function login() {
+      return request.auth != null;
+    }
+
+    function mine(uid) {
+      return login() && request.auth.uid == uid;
+    }
+
+    function profil(uid) {
+      return get(/databases/$(database)/documents/akun/items/data/$(uid)).data;
+    }
+
+    function peranSaya() {
+      return profil(request.auth.uid).peran;
+    }
+
+    function aktifSaya() {
+      return profil(request.auth.uid).aktif == true;
+    }
+
+    function peran(n) {
+      return login() && aktifSaya() && peranSaya() == n;
+    }
+
+    function adminKab() {
+      return peran('admin_kabupaten') || peran('super_admin');
+    }
+
+    // Penilai = pengawas senior / ketua tim penilai yang mengisi instrumen.
+    function penilai() {
+      return peran('penilai');
+    }
+
+    // Pengawas = objek penilaian, hanya boleh melihat hasilnya sendiri.
+    function pengawasDinilai() {
+      return peran('pengawas');
+    }
+
+    function uidPengawas() {
+      return profil(request.auth.uid).pengawasId;
+    }
+
+    /* -------------------------------------------------------------- */
+    /* Akun                                                           */
+    /* -------------------------------------------------------------- */
+
+    match /akun/items/data/{uid} {
+      // Profil sendiri selalu boleh dibaca; admin boleh membaca semua.
+      allow read: if mine(uid) || adminKab();
+      // Pendaftaran akun baru: hanya dokumen milik sendiri dan belum ada,
+      // dengan peran & orgId yang akan divalidasi ulang oleh Function
+      // `tautkanAkun`. Tidak boleh mendaftar sebagai admin dari klien.
+      allow create: if mine(uid)
+        && !exists(/databases/$(database)/documents/akun/items/data/$(uid))
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.peran in ['penilai', 'pengawas']
+        && request.resource.data.aktif == true;
+      // Setelah ada, profil hanya boleh diubah lewat Function / admin.
+      allow update: if adminKab();
+      allow delete: if adminKab();
+    }
+
+    // Penanda admin: ditulis hanya oleh Function seedAdmin.
+    match /admin/items/data/{uid} {
+      allow read: if mine(uid) || adminKab();
+      allow write: if false;
+    }
+
+    /* -------------------------------------------------------------- */
+    /* Kode aktivasi — hanya boleh dibaca saat aktivasi, tulis via Function */
+    /* -------------------------------------------------------------- */
+
+    match /kodeAktivasi/items/data/{kode} {
+      allow get: if true;          // aktivasi belum login
+      allow list: if adminKab();
+      allow write: if false;       // terbitkanKode / ubahStatusKode (Function)
+    }
+
+    /* -------------------------------------------------------------- */
+    /* Data master                                                    */
+    /* -------------------------------------------------------------- */
+
+    match /org/items/data/{id} {
+      allow read: if login();
+      allow write: if false;       // dikelola lewat Console / Function
+    }
+
+    match /periods/items/data/{id} {
+      allow read: if login();
+      allow write: if adminKab();
+    }
+
+    match /indicators/items/data/{id} {
+      allow read: if login();
+      allow write: if adminKab();
+    }
+
+    match /regulasi/items/data/{id} {
+      allow read: if login();
+      allow write: if adminKab();
+    }
+
+    match /regulations/items/data/{id} {
+      allow read: if login();
+      allow write: if adminKab();
+    }
+
+    /* -------------------------------------------------------------- */
+    /* Data penilaian                                                 */
+    /* -------------------------------------------------------------- */
+
+    match /assessments/items/data/{id} {
+      allow read: if adminKab() || penilai()
+        || (pengawasDinilai() && resource.data.supervisorId == uidPengawas());
+      allow create: if penilai() && request.resource.data.assessorId == request.auth.uid
+        || adminKab();
+      allow update: if (penilai() && request.resource.data.assessorId == request.auth.uid)
+        || adminKab();
+      allow delete: if adminKab();
+    }
+
+    // Hasil akhir per pengawas. Setelah status 'final', penilai tidak bisa
+    // mengubah lagi — hanya admin yang boleh membuka kunci.
+    match /results/items/data/{id} {
+      allow read: if adminKab() || penilai()
+        || (pengawasDinilai() && resource.data.supervisorId == uidPengawas());
+      allow create: if penilai() && request.resource.data.assessorId == request.auth.uid;
+      allow update: if (penilai()
+        && request.resource.data.assessorId == request.auth.uid
+        && resource.data.status != 'final')
+        || adminKab();
+      allow delete: if adminKab();
+    }
+
+    match /assignments/items/data/{id} {
+      allow read: if adminKab() || penilai()
+        || (pengawasDinilai() && resource.data.supervisorId == uidPengawas());
+      allow write: if adminKab();
+    }
+
+    match /supervisors/items/data/{id} {
+      allow read: if adminKab() || penilai()
+        || (pengawasDinilai() && id == uidPengawas());
+      allow write: if adminKab();
+    }
+
+    match /audits/items/data/{id} {
+      allow read: if adminKab();
+      allow create: if login();
+      allow update, delete: if false;
+    }
+
+    match /audit/items/data/{id} {
+      allow read: if adminKab();
+      allow write: if false;       // ditulis Function
+    }
+
+    match /snapshots/items/data/{id} {
+      allow read, write: if adminKab();
+    }
+
+    /* -------------------------------------------------------------- */
+    /* Sisanya tertutup                                               */
+    /* -------------------------------------------------------------- */
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

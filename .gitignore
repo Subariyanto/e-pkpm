@@ -6,3 +6,7 @@ playwright-report/
 .env.local
 *.tsbuildinfo
 .DS_Store
+
+# Cloud Functions
+functions/lib/
+functions/node_modules/

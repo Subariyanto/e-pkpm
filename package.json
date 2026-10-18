@@ -16,6 +16,7 @@
     "@supabase/supabase-js": "latest",
     "dexie": "latest",
     "dexie-react-hooks": "latest",
+    "firebase": "^13.0.0",
     "html2canvas": "latest",
     "jspdf": "latest",
     "lucide-react": "latest",
