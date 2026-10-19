@@ -177,9 +177,10 @@ export async function pushKeAwan(database: PKPMDatabase, opsi?: { paksa?: boolea
   const t0 = Date.now();
   const { firestore } = await modul();
   const dbAwan = await firestoreUntuk(cfg);
-  const { doc, setDoc, serverTimestamp } = firestore;
+  const { doc, serverTimestamp } = firestore;
 
   let pushed = 0, skipped = 0;
+  const gagal: string[] = [];
 
   for (const tabel of database.tables) {
     if (LOKAL_SAJA.has(tabel.name)) continue;
@@ -192,30 +193,44 @@ export async function pushKeAwan(database: PKPMDatabase, opsi?: { paksa?: boolea
       const bagian = layak.slice(i, i + 400);
       const refs: any[] = [];
       const payloads: Record<string, unknown>[] = [];
+      const hashBaru: { kunci: string; nilai: string }[] = [];
       for (const r of bagian) {
         const id = String(r.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
-        const hashBaru = ringkas(r);
+        const hash = ringkas(r);
         const kunciHash = `hash:${tabel.name}:${id}`;
-        if (!opsi?.paksa && localStorage.getItem(kunciHash) === hashBaru) { skipped++; continue; }
+        if (!opsi?.paksa && localStorage.getItem(kunciHash) === hash) { skipped++; continue; }
         const { data } = perkecilRecord(r);
         refs.push(doc(dbAwan, koleksi(tabel.name), 'items', id));
         payloads.push({ ...data, id, _syncedAt: serverTimestamp() });
-        localStorage.setItem(kunciHash, hashBaru);
+        hashBaru.push({ kunci: kunciHash, nilai: hash });
       }
       if (!refs.length) continue;
-      // setDoc satu per satu via batch tulis dari SDK modular memakai writeBatch
-      const { writeBatch } = firestore;
-      const batch = writeBatch(dbAwan);
-      refs.forEach((ref, idx) => batch.set(ref, payloads[idx], { merge: true }));
-      await batch.commit();
-      pushed += refs.length;
+      try {
+        const { writeBatch } = firestore;
+        const batch = writeBatch(dbAwan);
+        refs.forEach((ref, idx) => batch.set(ref, payloads[idx], { merge: true }));
+        await batch.commit();
+        // Hash baru dicatat SETELAH commit berhasil. Bila commit gagal,
+        // catatan tidak ditulis sehingga record dicoba lagi pada kiriman
+        // berikutnya (sebelumnya hash ditulis lebih dulu → data bisa hilang
+        // dari antrean padahal belum pernah sampai ke Firestore).
+        for (const h of hashBaru) localStorage.setItem(h.kunci, h.nilai);
+        pushed += refs.length;
+      } catch (e: any) {
+        // Satu tabel ditolak Security Rules tidak boleh membatalkan tabel lain.
+        gagal.push(`${tabel.name} (${e?.code || e?.message || 'gagal'})`);
+        break;
+      }
     }
   }
 
+  const catatanGagal = gagal.length
+    ? ` ${gagal.length} tabel ditolak server: ${gagal.join(', ')}.`
+    : '';
   return {
     pushed, pulled: 0, skipped,
     durasiMs: Date.now() - t0,
-    pesan: `${pushed} dokumen dikirim ke Firestore${skipped ? `, ${skipped} dilewati (tidak berubah)` : ''}.`,
+    pesan: `${pushed} dokumen dikirim ke Firestore${skipped ? `, ${skipped} dilewati (tidak berubah)` : ''}.${catatanGagal}`,
   };
 }
 

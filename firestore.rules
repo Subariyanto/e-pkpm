@@ -109,6 +109,13 @@ service cloud.firestore {
       allow write: if false;       // dikelola lewat Console / Function
     }
 
+    // Tim penilai (tabel `users` di perangkat). Data ini disalin antar
+    // perangkat lewat menu Sinkron Cloud, jadi penilai & admin boleh menulis.
+    match /users/items/data/{id} {
+      allow read: if login();
+      allow write: if adminKab() || penilai();
+    }
+
     match /periods/items/data/{id} {
       allow read: if login();
       allow write: if adminKab();
@@ -136,11 +143,9 @@ service cloud.firestore {
     match /assessments/items/data/{id} {
       allow read: if adminKab() || penilai()
         || (pengawasDinilai() && resource.data.supervisorId == uidPengawas());
-      allow create: if penilai() && request.resource.data.assessorId == request.auth.uid
-        || adminKab();
-      allow update: if (penilai() && request.resource.data.assessorId == request.auth.uid)
-        || adminKab();
-      allow delete: if adminKab();
+      // `assessorId` pada data lokal adalah id pengguna di perangkat, bukan
+      // uid Firebase, sehingga pemeriksaan kesamaan uid tidak berlaku di sini.
+      allow write: if adminKab() || penilai();
     }
 
     // Hasil akhir per pengawas. Setelah status 'final', penilai tidak bisa
@@ -148,24 +153,23 @@ service cloud.firestore {
     match /results/items/data/{id} {
       allow read: if adminKab() || penilai()
         || (pengawasDinilai() && resource.data.supervisorId == uidPengawas());
-      allow create: if penilai() && request.resource.data.assessorId == request.auth.uid;
-      allow update: if (penilai()
-        && request.resource.data.assessorId == request.auth.uid
-        && resource.data.status != 'final')
-        || adminKab();
-      allow delete: if adminKab();
+      // Sama seperti `assessments`: assessorId bukan uid Firebase.
+      // Hasil berstatus 'final' tetap hanya bisa dibuka admin.
+      allow write: if adminKab()
+        || (penilai() && (!resource.data.keys().hasAny(['status'])
+            || resource.data.status != 'final'));
     }
 
     match /assignments/items/data/{id} {
       allow read: if adminKab() || penilai()
         || (pengawasDinilai() && resource.data.supervisorId == uidPengawas());
-      allow write: if adminKab();
+      allow write: if adminKab() || penilai();
     }
 
     match /supervisors/items/data/{id} {
       allow read: if adminKab() || penilai()
         || (pengawasDinilai() && id == uidPengawas());
-      allow write: if adminKab();
+      allow write: if adminKab() || penilai();
     }
 
     match /audits/items/data/{id} {
