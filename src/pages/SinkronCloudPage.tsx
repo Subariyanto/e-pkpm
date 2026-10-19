@@ -23,6 +23,7 @@ export function SinkronCloud() {
   const [sibuk, setSibuk] = useState<'' | 'push' | 'pull' | 'cek' | 'simpan'>('');
   const [err, setErr] = useState('');
   const [timpa, setTimpa] = useState(false);
+  const [diagnostik, setDiagnostik] = useState('');
 
   useEffect(() => {
     const aktif = konfigAktif();
@@ -52,8 +53,25 @@ export function SinkronCloud() {
       } else if (jenis === 'cek') {
         setInfo(await cekKoneksi());
       } else if (jenis === 'push') {
-        setHasil(await pushKeAwan(db));
-      } else {
+        // Tangkap log internal pushKeAwan agar penyebab "0 dokumen" terlihat.
+        const log: string[] = [];
+        const asli = console.log;
+        const asliErr = console.error;
+        const asliWarn = console.warn;
+        console.log = (...a: any[]) => { log.push(a.map(String).join(' ')); asli(...a); };
+        console.error = (...a: any[]) => { log.push('[ERR] ' + a.map(String).join(' ')); asliErr(...a); };
+        console.warn = (...a: any[]) => { log.push('[WARN] ' + a.map(String).join(' ')); asliWarn(...a); };
+        try {
+          setHasil(await pushKeAwan(db));
+        } finally {
+          console.log = asli; console.error = asliErr; console.warn = asliWarn;
+        }
+        // Hitung record per tabel untuk ditampilkan.
+        const hitung: string[] = [];
+        for (const t of db.tables) {
+          try { const n = await t.count(); hitung.push(`${t.name}: ${n}`); } catch { hitung.push(`${t.name}: ?`); }
+        }
+        setDiagnostik(log.join('\n') + '\n---\n' + hitung.join(', '));
         setHasil(await pullDariAwan(db, { timpa }));
       }
     } catch (e: any) {
@@ -147,6 +165,12 @@ export function SinkronCloud() {
               data lokal lama akan dihapus.
             </span>
           </label>
+          {diagnostik && (
+            <details className="mt-3">
+              <summary className="text-xs text-slate-500 cursor-pointer">Diagnostik push (klik untuk melihat)</summary>
+              <pre className="mt-2 text-xs bg-slate-900 text-slate-100 rounded-lg p-3 overflow-auto max-h-48 whitespace-pre-wrap">{diagnostik}</pre>
+            </details>
+          )}
           {hasil && (
             <div className="mt-3 rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-sm">
               <p className="font-semibold text-emerald-800">{hasil.pesan}</p>
