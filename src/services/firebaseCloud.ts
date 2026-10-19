@@ -55,8 +55,13 @@ const SNAPSHOT_TARGET = 380; // rerata byte batas aman per dokumen (lihat catata
 
 /** Ambil konfigurasi dari env build (Vite) bila ada, lalu dari localStorage. */
 export function konfigAktif(): FirebaseConfig | null {
+  // 1. Nilai yang disuntikkan saat runtime (mis. dari index.html).
   const env = (globalThis as any).__FIREBASE_ENV__ as Partial<FirebaseConfig> | undefined;
   if (env?.apiKey && env?.projectId) return env as FirebaseConfig;
+  // 2. Nilai dari build (.env → VITE_FIREBASE_*). Ini jalur utama di produksi.
+  const dariEnv = konfigDariEnv();
+  if (dariEnv) return dariEnv;
+  // 3. Terakhir, konfigurasi yang ditempel manual lewat menu Sinkron Cloud.
   try {
     const raw = localStorage.getItem(KONFIG_KEY);
     if (!raw) return null;
