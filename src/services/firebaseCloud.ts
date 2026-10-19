@@ -147,6 +147,21 @@ async function pastikanSesi() {
   return a;
 }
 
+/** Diagnostik aman: identitas sesi Firebase vs identitas sesi aplikasi lokal. */
+export async function diagnostikSesi() {
+  const a = await pastikanSesi();
+  const u = a.currentUser;
+  const claims = await u.getIdTokenResult();
+  return {
+    uidAuth: u.uid,
+    emailAuth: u.email || '',
+    projectAuth: (u as any).auth?.app?.options?.projectId || '',
+    uidAplikasi: sessionStorage.getItem('pkpm_admin_key') || sessionStorage.getItem('userId') || '',
+    roleAplikasi: sessionStorage.getItem('userRole') || '',
+    authAud: String(claims.claims.aud || ''),
+  };
+}
+
 /* ------------------------------------------------------------------ */
 /* Pemetaan tabel ↔ koleksi                                           */
 /* ------------------------------------------------------------------ */

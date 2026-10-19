@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Card, Button, PageTitle } from '../components/Layout';
 import { db } from '../lib/db';
 import {
-  cekKoneksi, konfigAktif, simpanKonfig, pullDariAwan, pushKeAwan,
+  cekKoneksi, konfigAktif, simpanKonfig, pullDariAwan, pushKeAwan, diagnostikSesi,
   type FirebaseConfig, type SyncInfo, type SyncResult,
 } from '../services/firebaseCloud';
 
@@ -24,6 +24,7 @@ export function SinkronCloud() {
   const [err, setErr] = useState('');
   const [timpa, setTimpa] = useState(false);
   const [diagnostik, setDiagnostik] = useState('');
+  const [sesiInfo, setSesiInfo] = useState('');
 
   useEffect(() => {
     const aktif = konfigAktif();
@@ -50,8 +51,10 @@ export function SinkronCloud() {
         const cfg = bacaForm();
         simpanKonfig(cfg);
         setInfo(await cekKoneksi());
+        try { setSesiInfo(JSON.stringify(await diagnostikSesi(), null, 2)); } catch (e: any) { setSesiInfo(e?.message || String(e)); }
       } else if (jenis === 'cek') {
         setInfo(await cekKoneksi());
+        try { setSesiInfo(JSON.stringify(await diagnostikSesi(), null, 2)); } catch (e: any) { setSesiInfo(e?.message || String(e)); }
       } else if (jenis === 'push') {
         // Tangkap log internal pushKeAwan agar penyebab "0 dokumen" terlihat.
         const log: string[] = [];
@@ -138,9 +141,9 @@ export function SinkronCloud() {
             </b>
           </p>
           <p className="text-xs text-slate-500 mt-3 leading-relaxed">
-            Bila "belum terhubung" padahal konfigurasi benar, periksa Security Rules sudah
-            terpasang dan login aplikasi sudah memakai akun Firebase Auth.
+            Bila izin ditolak, periksa apakah UID Firebase Auth sama dengan UID akun aplikasi.
           </p>
+          {sesiInfo && <pre className="mt-2 text-[10px] bg-slate-100 rounded p-2 overflow-auto whitespace-pre-wrap">Sesi Firebase: {sesiInfo}</pre>}
         </Card>
 
         <Card className="lg:col-span-2">
