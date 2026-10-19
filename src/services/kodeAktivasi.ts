@@ -326,7 +326,11 @@ export async function terbitkanKode(opts: {
 export async function daftarKode(orgId: string): Promise<{ sukses: boolean; data: KodeAktivasi[]; alasan: string }> {
   try {
     const { fs } = siapkan();
-    const q = query(collection(fs, 'kodeAktivasi', 'items', 'data'), where('orgId', '==', orgId));
+    const kol = collection(fs, 'kodeAktivasi', 'items', 'data');
+    // orgId kosong = admin belum menyebutkan organisasi. Jangan memfilter
+    // dengan nilai kosong: kode terbitan selalu membawa orgId admin, jadi
+    // query akan selalu nol. Security Rules sudah membatasi list ke admin.
+    const q = orgId ? query(kol, where('orgId', '==', orgId)) : query(kol);
     const snap = await getDocs(q);
     const data = snap.docs.map(d => ({ ...(d.data() as KodeAktivasi), code: d.id }));
     return { sukses: true, data, alasan: 'ok' };
