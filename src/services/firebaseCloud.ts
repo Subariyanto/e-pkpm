@@ -124,6 +124,29 @@ async function firestoreUntuk(cfg: FirebaseConfig) {
   return db;
 }
 
+/**
+ * Pastikan SDK Auth sudah diinisialisasi dan sesinya sudah pulih.
+ *
+ * Firestore hanya menyertakan token pengguna bila instance Auth untuk app yang
+ * sama sudah dibuat. Setelah halaman dimuat ulang, sesi tampak aktif karena
+ * `sessionStorage` masih menyimpan userId, padahal SDK Auth belum tentu
+ * diinisialisasi — akibatnya semua permintaan Firestore berjalan tanpa
+ * identitas dan ditolak Security Rules.
+ */
+async function pastikanSesi() {
+  const { auth } = await import('./kodeAktivasi');
+  const a = auth();
+  // Tunggu pemulihan sesi dari penyimpanan lokal (Firebase 10+).
+  try { await (a as any).authStateReady?.(); } catch { /* versi lama */ }
+  if (!a.currentUser) {
+    throw new Error(
+      'Sesi Firebase belum aktif di perangkat ini. Keluar lalu login ulang, ' +
+      'baru tekan tombol sinkronisasi.',
+    );
+  }
+  return a;
+}
+
 /* ------------------------------------------------------------------ */
 /* Pemetaan tabel ↔ koleksi                                           */
 /* ------------------------------------------------------------------ */
@@ -174,6 +197,7 @@ function gabungRecord(rec: Record<string, unknown>) {
 export async function pushKeAwan(database: PKPMDatabase, opsi?: { paksa?: boolean }): Promise<SyncResult> {
   const cfg = konfigAktif();
   if (!cfg) throw new Error('Konfigurasi Firebase belum diisi. Buka menu Sinkron Cloud lalu tempel konfigurasi project Firebase.');
+  await pastikanSesi();
   const t0 = Date.now();
   const { firestore } = await modul();
   const dbAwan = await firestoreUntuk(cfg);
@@ -246,6 +270,7 @@ export async function pushKeAwan(database: PKPMDatabase, opsi?: { paksa?: boolea
 export async function pullDariAwan(database: PKPMDatabase, opsi?: { timpa?: boolean }): Promise<SyncResult> {
   const cfg = konfigAktif();
   if (!cfg) throw new Error('Konfigurasi Firebase belum diisi.');
+  await pastikanSesi();
   const t0 = Date.now();
   const { firestore } = await modul();
   const dbAwan = await firestoreUntuk(cfg);
@@ -307,11 +332,15 @@ export async function cekKoneksi(): Promise<SyncInfo> {
   const cfg = konfigAktif();
   if (!cfg) return { online: false };
   try {
+    await pastikanSesi();
     const { firestore } = await modul();
     const dbAwan = await firestoreUntuk(cfg);
     const { collection, getDocs, limit, query } = firestore;
-    const probe = await getDocs(query(collection(dbAwan, 'madrasahs', 'items'), limit(1)));
-    return { online: true, projectId: cfg.projectId, remoteCounts: { madrasahs: probe.size } };
+    // Koleksi uji harus yang benar-benar ada di Security Rules. Sebelumnya
+    // memakai `madrasahs` (sisa aplikasi lain) yang tidak terdaftar, sehingga
+    // pemeriksaan selalu gagal dan tampil "belum terhubung" walau sesi sehat.
+    const probe = await getDocs(query(collection(dbAwan, 'org', 'items'), limit(1)));
+    return { online: true, projectId: cfg.projectId, remoteCounts: { org: probe.size } };
   } catch (e: any) {
     return { online: false, projectId: cfg.projectId };
   }
