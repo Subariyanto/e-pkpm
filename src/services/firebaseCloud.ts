@@ -189,6 +189,13 @@ function gabungRecord(rec: Record<string, unknown>) {
 /* Push (lokal → awan)                                                */
 /* ------------------------------------------------------------------ */
 
+/** Id dokumen ditulis ter-encode karena bisa memuat garis miring. */
+const DOK = 'data';
+
+function refDoc(dbAwan: any, fsMod: any, tabel: string, id: string) {
+  return fsMod.doc(dbAwan, tabel, 'items', DOK, encodeURIComponent(id));
+}
+
 /**
  * Dorong isi database lokal ke Firestore.
  * Record yang isinya tidak berubah sejak sinkronisasi terakhir dilewati,
@@ -224,7 +231,7 @@ export async function pushKeAwan(database: PKPMDatabase, opsi?: { paksa?: boolea
         const kunciHash = `hash:${tabel.name}:${id}`;
         if (!opsi?.paksa && localStorage.getItem(kunciHash) === hash) { skipped++; continue; }
         const { data } = perkecilRecord(r);
-        refs.push(doc(dbAwan, koleksi(tabel.name), 'items', id));
+        refs.push(refDoc(dbAwan, firestore, koleksi(tabel.name), id));
         payloads.push({ ...data, id, _syncedAt: serverTimestamp() });
         hashBaru.push({ kunci: kunciHash, nilai: hash });
       }
@@ -280,10 +287,14 @@ export async function pullDariAwan(database: PKPMDatabase, opsi?: { timpa?: bool
 
   for (const tabel of database.tables) {
     if (LOKAL_SAJA.has(tabel.name)) continue;
-    const snap = await getDocs(collection(dbAwan, koleksi(tabel.name), 'items'));
+    const snap = await getDocs(collection(dbAwan, koleksi(tabel.name), 'items', DOK));
     const records: Record<string, unknown>[] = [];
     for (const d of snap.docs) {
       const raw = d.data() as Record<string, unknown>;
+      // Kembalikan id ke bentuk asli (yang ditulis ter-encode ke awan).
+      if (typeof raw.id === 'string') {
+        try { raw.id = decodeURIComponent(raw.id); } catch { /* biarkan */ }
+      }
       records.push(gabungRecord(raw));
     }
     if (!records.length) continue;
@@ -339,7 +350,7 @@ export async function cekKoneksi(): Promise<SyncInfo> {
     // Koleksi uji harus yang benar-benar ada di Security Rules. Sebelumnya
     // memakai `madrasahs` (sisa aplikasi lain) yang tidak terdaftar, sehingga
     // pemeriksaan selalu gagal dan tampil "belum terhubung" walau sesi sehat.
-    const probe = await getDocs(query(collection(dbAwan, 'org', 'items'), limit(1)));
+    const probe = await getDocs(query(collection(dbAwan, 'org', 'items', DOK), limit(1)));
     return { online: true, projectId: cfg.projectId, remoteCounts: { org: probe.size } };
   } catch (e: any) {
     return { online: false, projectId: cfg.projectId };
