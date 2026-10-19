@@ -64,6 +64,17 @@ service cloud.firestore {
       return profil(request.auth.uid).pengawasId;
     }
 
+    // Akun admin pertama belum tentu punya dokumen profil. Tanpa cadangan ini,
+    // peranSaya() gagal dievaluasi dan SEMUA koleksi menolak dengan
+    // permission-denied, termasuk koleksi yang mestinya boleh ditulis admin.
+    function peranCadangan() {
+      return exists(/databases/$(database)/documents/admin/items/data/$(request.auth.uid));
+    }
+
+    function bolehTulisMaster() {
+      return adminKab() || peranCadangan();
+    }
+
     /* -------------------------------------------------------------- */
     /* Akun                                                           */
     /* -------------------------------------------------------------- */
@@ -106,24 +117,26 @@ service cloud.firestore {
 
     match /org/items/data/{id} {
       allow read: if login();
-      allow write: if false;       // dikelola lewat Console / Function
+      // Admin perlu menyelaraskan identitas organisasi (nama pejabat, kop
+      // surat) antarperangkat lewat menu Sinkron Cloud.
+      allow write: if bolehTulisMaster();
     }
 
     // Tim penilai (tabel `users` di perangkat). Data ini disalin antar
     // perangkat lewat menu Sinkron Cloud, jadi penilai & admin boleh menulis.
     match /users/items/data/{id} {
       allow read: if login();
-      allow write: if adminKab() || penilai();
+      allow write: if bolehTulisMaster() || penilai();
     }
 
     match /periods/items/data/{id} {
       allow read: if login();
-      allow write: if adminKab();
+      allow write: if bolehTulisMaster();
     }
 
     match /indicators/items/data/{id} {
       allow read: if login();
-      allow write: if adminKab();
+      allow write: if bolehTulisMaster();
     }
 
     match /regulasi/items/data/{id} {
@@ -141,21 +154,21 @@ service cloud.firestore {
     /* -------------------------------------------------------------- */
 
     match /assessments/items/data/{id} {
-      allow read: if adminKab() || penilai()
+      allow read: if bolehTulisMaster() || penilai()
         || (pengawasDinilai() && resource.data.supervisorId == uidPengawas());
       // `assessorId` pada data lokal adalah id pengguna di perangkat, bukan
       // uid Firebase, sehingga pemeriksaan kesamaan uid tidak berlaku di sini.
-      allow write: if adminKab() || penilai();
+      allow write: if bolehTulisMaster() || penilai();
     }
 
     // Hasil akhir per pengawas. Setelah status 'final', penilai tidak bisa
     // mengubah lagi — hanya admin yang boleh membuka kunci.
     match /results/items/data/{id} {
-      allow read: if adminKab() || penilai()
+      allow read: if bolehTulisMaster() || penilai()
         || (pengawasDinilai() && resource.data.supervisorId == uidPengawas());
       // Sama seperti `assessments`: assessorId bukan uid Firebase.
       // Hasil berstatus 'final' tetap hanya bisa dibuka admin.
-      allow write: if adminKab()
+      allow write: if bolehTulisMaster()
         || (penilai() && (!resource.data.keys().hasAny(['status'])
             || resource.data.status != 'final'));
     }
@@ -167,13 +180,13 @@ service cloud.firestore {
     }
 
     match /supervisors/items/data/{id} {
-      allow read: if adminKab() || penilai()
+      allow read: if bolehTulisMaster() || penilai()
         || (pengawasDinilai() && id == uidPengawas());
-      allow write: if adminKab() || penilai();
+      allow write: if bolehTulisMaster() || penilai();
     }
 
     match /audits/items/data/{id} {
-      allow read: if adminKab();
+      allow read: if bolehTulisMaster();
       allow create: if login();
       allow update, delete: if false;
     }
@@ -184,7 +197,7 @@ service cloud.firestore {
     }
 
     match /snapshots/items/data/{id} {
-      allow read, write: if adminKab();
+      allow read, write: if bolehTulisMaster();
     }
 
     /* -------------------------------------------------------------- */

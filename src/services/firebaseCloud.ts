@@ -216,17 +216,27 @@ export async function pushKeAwan(database: PKPMDatabase, opsi?: { paksa?: boolea
   for (const tabel of database.tables) {
     if (LOKAL_SAJA.has(tabel.name)) continue;
     const rows = (await tabel.toArray()) as Record<string, unknown>[];
-    // Bagi ke beberapa batch agar 1 batch ≤ 500 operasi (batas Firestore).
-    const layak = rows.filter(r => {
-      return r && (r.id !== undefined || tabel.name === 'audits');
-    });
-    for (let i = 0; i < layak.length; i += 400) {
-      const bagian = layak.slice(i, i + 400);
+    // Tabel dengan primary key auto-increment (`audits`) belum punya `id`
+    // di setiap record. Sebelumnya filter ini membuang SEMUA barisnya,
+    // lalu baris kosong itu tetap dianggap sebagai payload tanpa `id` —
+    // Firestore menolaknya dengan `invalid-argument`. Sekarang id diambil
+    // dari primary key tabel bila record belum memilikinya.
+    const records: { id: string; data: Record<string, unknown> }[] = [];
+    for (const r of rows) {
+      if (!r) continue;
+      let id = r.id as string | number | undefined;
+      if (id === undefined) {
+        try { id = await tabel.get(r as any).then((v: any) => v?.id); } catch { /* abaikan */ }
+      }
+      if (id === undefined) continue;
+      records.push({ id: String(id), data: r });
+    }
+    for (let i = 0; i < records.length; i += 400) {
+      const bagian = records.slice(i, i + 400);
       const refs: any[] = [];
       const payloads: Record<string, unknown>[] = [];
       const hashBaru: { kunci: string; nilai: string }[] = [];
-      for (const r of bagian) {
-        const id = String(r.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+      for (const { id, data: r } of bagian) {
         const hash = ringkas(r);
         const kunciHash = `hash:${tabel.name}:${id}`;
         if (!opsi?.paksa && localStorage.getItem(kunciHash) === hash) { skipped++; continue; }
@@ -294,6 +304,14 @@ export async function pullDariAwan(database: PKPMDatabase, opsi?: { timpa?: bool
       // Kembalikan id ke bentuk asli (yang ditulis ter-encode ke awan).
       if (typeof raw.id === 'string') {
         try { raw.id = decodeURIComponent(raw.id); } catch { /* biarkan */ }
+      } else {
+        raw.id = decodeURIComponent(d.id);
+      }
+      // Tabel auto-increment (`audits`) memakai primary key angka. IndexedDB
+      // menolak `put` bila tipe kuncinya salah — inilah penyebab galat
+      // "Evaluating the object store's key path did not yield a value".
+      if (tabel.schema.primKey.auto && typeof raw.id === 'string' && /^\d+$/.test(raw.id)) {
+        raw.id = Number(raw.id);
       }
       records.push(gabungRecord(raw));
     }
