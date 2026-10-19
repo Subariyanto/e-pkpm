@@ -396,6 +396,18 @@ export const seedAdmin = https.onCall(
         uid, username, orgId, aktif: true,
         dibuatAt: FieldValue.serverTimestamp(),
       }, { merge: true });
+      // Organisasi ikut dibuat saat bootstrap pertama, supaya admin langsung
+      // punya orgId yang sah. Hanya lewat bootstrap — bukan panggilan admin biasa.
+      if (lewatBootstrap && orgId) {
+        batch.set(db.doc(`org/items/data/${orgId}`), {
+          orgId,
+          nama: String(data?.orgNama || orgId),
+          kabupaten: String(data?.kabupaten || 'Jember'),
+          provinsi: String(data?.provinsi || 'Jawa Timur'),
+          aktif: true,
+          dibuatAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
       await batch.commit();
       await catatAudit('seed_admin', { uid, username, orgId, lewatBootstrap });
       return { sukses: true, alasan: 'ok', uid };
