@@ -216,18 +216,10 @@ export async function pushKeAwan(database: PKPMDatabase, opsi?: { paksa?: boolea
   for (const tabel of database.tables) {
     if (LOKAL_SAJA.has(tabel.name)) continue;
     const rows = (await tabel.toArray()) as Record<string, unknown>[];
-    // Tabel dengan primary key auto-increment (`audits`) belum punya `id`
-    // di setiap record. Sebelumnya filter ini membuang SEMUA barisnya,
-    // lalu baris kosong itu tetap dianggap sebagai payload tanpa `id` —
-    // Firestore menolaknya dengan `invalid-argument`. Sekarang id diambil
-    // dari primary key tabel bila record belum memilikinya.
     const records: { id: string; data: Record<string, unknown> }[] = [];
     for (const r of rows) {
       if (!r) continue;
       let id = r.id as string | number | undefined;
-      if (id === undefined) {
-        try { id = await tabel.get(r as any).then((v: any) => v?.id); } catch { /* abaikan */ }
-      }
       if (id === undefined) continue;
       records.push({ id: String(id), data: r });
     }
