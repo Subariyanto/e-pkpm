@@ -8,7 +8,7 @@
  *
  * Hasil akhir tetap digabung oleh Ketua Pokjawas lewat menu "Gabung Data".
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, audit } from '../lib/db';
 import { Button, Card, PageTitle, IconButton } from '../components/Layout';
@@ -64,6 +64,13 @@ export function MyProfilePage() {
   const [form, setForm] = useState<SasaranForm | null>(null);
   const [formId, setFormId] = useState<string | null>(null); // null = mode tambah
   const [formErr, setFormErr] = useState('');
+  // Pesan khusus kartu Identitas Penilai & Pejabat. Sebelumnya semua pesan
+  // memakai satu state `info` yang dirender di kartu Sasaran — jauh di bawah
+  // tombol Simpan — sehingga kegagalan validasi tampak seperti tombol mati.
+  const [profilErr, setProfilErr] = useState('');
+  const [profilOk, setProfilOk] = useState('');
+  const [pejabatErr, setPejabatErr] = useState('');
+  const [pejabatOk, setPejabatOk] = useState('');
 
   const profil = useLiveQuery(() => db.settings.get('profilPenilai'), []);
   const orgRow = useLiveQuery(() => db.org.toCollection().first(), []);
@@ -75,9 +82,39 @@ export function MyProfilePage() {
   const ps = useLiveQuery(() => db.supervisors.toArray(), []) || [];
   const aku = useMemo(() => ps.find(x => x.nip === p?.nip), [ps, p?.nip]);
 
+  /*
+   * Isi kolom dengan nilai yang sudah tersimpan.
+   * Sebelumnya kolom dibiarkan kosong dan hanya memakai placeholder abu-abu.
+   * Di ponsel placeholder mudah disangka isian sungguhan, sehingga pengguna
+   * mengira datanya hilang setiap kali berpindah menu. Nilai yang sedang
+   * diketik tidak pernah ditimpa karena hanya diisi bila kolom masih kosong.
+   */
+  useEffect(() => {
+    if (!p) return;
+    setNama(v => v || p.nama || '');
+    setNip(v => v || p.nip || '');
+    setJabatan(v => v || p.jabatan || '');
+    setUnit(v => v || p.unit || '');
+    setKabupaten(v => v || p.kabupaten || '');
+    const kop = p.kop || [];
+    setKop1(v => v || kop[0] || '');
+    setKop2(v => v || kop[1] || '');
+    setKop3(v => v || kop[2] || '');
+    setKop4(v => v || kop[3] || '');
+  }, [p]);
+
+  useEffect(() => {
+    if (!orgRow) return;
+    setKetuaPokjawas(v => v || orgRow.chairman || '');
+    setKepalaKantor(v => v || orgRow.headOffice || '');
+    setNipKetua(v => v || (orgRow as any).nipChairman || '');
+    setNipKantor(v => v || (orgRow as any).nipHeadOffice || '');
+  }, [orgRow]);
+
   async function simpanProfil() {
+    setProfilErr(''); setProfilOk('');
     const n = (nama || p?.nama || '').trim();
-    const pin = (nip || p?.nip || '').trim();
+    const pin = (nip || p?.nip || '').replace(/\D/g, '');
     const j = (jabatan || p?.jabatan || '').trim();
     const u = (unit || p?.unit || '').trim();
     const kab = (kabupaten || p?.kabupaten || '').trim();
@@ -88,53 +125,69 @@ export function MyProfilePage() {
       (kop3 || kopLama[2] || '').trim(),
       (kop4 || kopLama[3] || '').trim(),
     ];
-    if (!n) return setInfo('Nama penilai wajib diisi.');
-    if (pin && !/^\d{18}$/.test(pin)) return setInfo('NIP wajib 18 digit angka (boleh dikosongkan).');
-    if (pin) {
-      const bentrok = await db.supervisors.where('nip').equals(pin).first();
-      if (bentrok && bentrok.name !== n) {
-        return setInfo(`NIP ${pin} sudah dipakai pengawas "${bentrok.name}". Periksa kembali.`);
-      }
+    if (!n) return setProfilErr('Nama penilai wajib diisi.');
+    if (pin && !/^\d{18}$/.test(pin)) {
+      return setProfilErr(`NIP harus tepat 18 angka — yang terbaca ${pin.length} angka. Boleh dikosongkan.`);
     }
-    await db.settings.put({
-      key: 'profilPenilai',
-      value: { nama: n, nip: pin, jabatan: j, unit: u, kabupaten: kab, kop: kopBaru },
-    });
-    await audit('PROFIL_PENILAI', n, { nip: pin, kabupaten: kab });
-    setNama(''); setNip(''); setJabatan(''); setUnit('');
-    setKabupaten(''); setKop1(''); setKop2(''); setKop3(''); setKop4('');
-    setInfo('Profil penilai dan kop surat tersimpan di perangkat ini.');
+    try {
+      if (pin) {
+        const bentrok = await db.supervisors.where('nip').equals(pin).first();
+        if (bentrok && bentrok.name !== n) {
+          return setProfilErr(`NIP ${pin} sudah dipakai pengawas "${bentrok.name}". Periksa kembali.`);
+        }
+      }
+      await db.settings.put({
+        key: 'profilPenilai',
+        value: { nama: n, nip: pin, jabatan: j, unit: u, kabupaten: kab, kop: kopBaru },
+      });
+      await audit('PROFIL_PENILAI', n, { nip: pin, kabupaten: kab });
+      // Kolom sengaja tidak dikosongkan agar pengguna melihat data yang tersimpan.
+      setNama(n); setNip(pin); setJabatan(j); setUnit(u); setKabupaten(kab);
+      setKop1(kopBaru[0]); setKop2(kopBaru[1]); setKop3(kopBaru[2]); setKop4(kopBaru[3]);
+      setProfilOk('Profil penilai dan kop surat tersimpan di perangkat ini.');
+    } catch (e: any) {
+      // Tanpa penanganan galat, kegagalan tulis membuat tombol tampak mati.
+      setProfilErr('Gagal menyimpan: ' + (e?.message || String(e)));
+    }
   }
 
   /** Simpan data pejabat penandatangan ke tabel org (dibuat bila belum ada). */
   async function simpanPejabat() {
+    setPejabatErr(''); setPejabatOk('');
     const ketua = (ketuaPokjawas || orgRow?.chairman || '').trim();
     const kantor = (kepalaKantor || orgRow?.headOffice || '').trim();
-    const nipK = (nipKetua || (orgRow as any)?.nipChairman || '').trim();
-    const nipKn = (nipKantor || (orgRow as any)?.nipHeadOffice || '').trim();
-    if (!ketua && !kantor) return setInfo('Isi minimal salah satu nama pejabat penandatangan.');
-    if (nipK && !/^\d{18}$/.test(nipK)) return setInfo('NIP Ketua Pokjawas wajib 18 digit angka (boleh dikosongkan).');
-    if (nipKn && !/^\d{18}$/.test(nipKn)) return setInfo('NIP Kepala Kantor wajib 18 digit angka (boleh dikosongkan).');
-
-    if (orgRow) {
-      await db.org.update(orgRow.id, {
-        chairman: ketua, headOffice: kantor,
-        nipChairman: nipK, nipHeadOffice: nipKn,
-      } as any);
-    } else {
-      // Perangkat ini belum punya baris organisasi — buat baru agar data pejabat
-      // tidak hilang. Nilai identitas lain memakai bawaan yang aman.
-      await db.org.add({
-        id: 'ORG-JEMBER', name: 'Pokjawas Madrasah Kabupaten Jember',
-        district: 'Kabupaten Jember', province: 'Jawa Timur',
-        chairman: ketua, headOffice: kantor,
-        address: '', phone: '', email: '', period: '2026',
-        nipChairman: nipK, nipHeadOffice: nipKn,
-      } as any);
+    const nipK = (nipKetua || (orgRow as any)?.nipChairman || '').replace(/\D/g, '');
+    const nipKn = (nipKantor || (orgRow as any)?.nipHeadOffice || '').replace(/\D/g, '');
+    if (!ketua && !kantor) return setPejabatErr('Isi minimal salah satu nama pejabat penandatangan.');
+    if (nipK && !/^\d{18}$/.test(nipK)) {
+      return setPejabatErr(`NIP Ketua Pokjawas harus tepat 18 angka — yang terbaca ${nipK.length} angka.`);
     }
-    await audit('PEJABAT_TTD', 'Penandatangan', { ketua, kantor });
-    setKetuaPokjawas(''); setNipKetua(''); setKepalaKantor(''); setNipKantor('');
-    setInfo('Nama dan NIP pejabat penandatangan tersimpan.');
+    if (nipKn && !/^\d{18}$/.test(nipKn)) {
+      return setPejabatErr(`NIP Kepala Kantor harus tepat 18 angka — yang terbaca ${nipKn.length} angka.`);
+    }
+    try {
+      if (orgRow) {
+        await db.org.update(orgRow.id, {
+          chairman: ketua, headOffice: kantor,
+          nipChairman: nipK, nipHeadOffice: nipKn,
+        } as any);
+      } else {
+        // Perangkat ini belum punya baris organisasi — buat baru agar data pejabat
+        // tidak hilang. Nilai identitas lain memakai bawaan yang aman.
+        await db.org.add({
+          id: 'ORG-JEMBER', name: 'Pokjawas Madrasah Kabupaten Jember',
+          district: 'Kabupaten Jember', province: 'Jawa Timur',
+          chairman: ketua, headOffice: kantor,
+          address: '', phone: '', email: '', period: '2026',
+          nipChairman: nipK, nipHeadOffice: nipKn,
+        } as any);
+      }
+      await audit('PEJABAT_TTD', 'Penandatangan', { ketua, kantor });
+      setKetuaPokjawas(ketua); setNipKetua(nipK); setKepalaKantor(kantor); setNipKantor(nipKn);
+      setPejabatOk('Nama dan NIP pejabat penandatangan tersimpan.');
+    } catch (e: any) {
+      setPejabatErr('Gagal menyimpan: ' + (e?.message || String(e)));
+    }
   }
 
   /** Buka form tambah sasaran (kosong). */
@@ -289,7 +342,12 @@ export function MyProfilePage() {
             <input className="input mt-1" value={nama} onChange={e => setNama(e.target.value)} placeholder={p?.nama || 'Nama lengkap'} />
           </label>
           <label className="text-sm">NIP
-            <input className="input mt-1" value={nip} onChange={e => setNip(e.target.value)} placeholder={p?.nip || '18 digit'} />
+            <input className="input mt-1" value={nip} inputMode="numeric" maxLength={18}
+              onChange={e => setNip(e.target.value.replace(/\D/g, ''))}
+              placeholder="18 digit" />
+            <span className={`block text-xs mt-1 ${nip && nip.length !== 18 ? 'text-amber-600' : 'text-slate-400'}`}>
+              {nip ? `${nip.length} dari 18 angka` : 'Boleh dikosongkan'}
+            </span>
           </label>
           <label className="text-sm">Kabupaten
             <input className="input mt-1" value={kabupaten} onChange={e => setKabupaten(e.target.value)}
@@ -328,7 +386,17 @@ export function MyProfilePage() {
             </label>
           </div>
         </div>
-        <div className="mt-4">
+        <div className="mt-4 space-y-2">
+          {profilErr && (
+            <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+              {profilErr}
+            </p>
+          )}
+          {profilOk && (
+            <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+              {profilOk}
+            </p>
+          )}
           <Button onClick={simpanProfil}>{p?.nama ? 'Perbarui Profil' : 'Simpan Profil'}</Button>
         </div>
       </Card>
@@ -344,8 +412,8 @@ export function MyProfilePage() {
                 placeholder={orgRow?.chairman || 'Nama lengkap + gelar'} />
             </label>
             <label className="text-sm block">NIP Ketua Pokjawas
-              <input className="input mt-1" value={nipKetua} onChange={e => setNipKetua(e.target.value)}
-                placeholder={(orgRow as any)?.nipChairman || '18 digit NIP'} />
+              <input className="input mt-1" value={nipKetua} inputMode="numeric" maxLength={18}
+                onChange={e => setNipKetua(e.target.value.replace(/\D/g, ''))} placeholder="18 digit NIP" />
             </label>
           </div>
           <div className="space-y-2">
@@ -354,12 +422,22 @@ export function MyProfilePage() {
                 placeholder={orgRow?.headOffice || 'Nama lengkap + gelar'} />
             </label>
             <label className="text-sm block">NIP Kepala Kantor
-              <input className="input mt-1" value={nipKantor} onChange={e => setNipKantor(e.target.value)}
-                placeholder={(orgRow as any)?.nipHeadOffice || '18 digit NIP'} />
+              <input className="input mt-1" value={nipKantor} inputMode="numeric" maxLength={18}
+                onChange={e => setNipKantor(e.target.value.replace(/\D/g, ''))} placeholder="18 digit NIP" />
             </label>
           </div>
         </div>
-        <div className="mt-3">
+        <div className="mt-3 space-y-2">
+          {pejabatErr && (
+            <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+              {pejabatErr}
+            </p>
+          )}
+          {pejabatOk && (
+            <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+              {pejabatOk}
+            </p>
+          )}
           <Button size="sm" onClick={simpanPejabat}>Simpan Penandatangan</Button>
         </div>
       </Card>
