@@ -8,12 +8,14 @@ import {
   adminReactivateCode,
   adminDeleteCode,
   adminGetStats,
+  adminListAccounts,
   verifyAdminKey,
   adminLogin,
   pesanAlasan,
   type KodeLisensi,
+  type AkunTerdaftar,
 } from '../services/lisensiFirebase';
-import { KeyRound, Plus, Trash2, Copy, Ban, RotateCcw, RefreshCw, Download, Check } from 'lucide-react';
+import { KeyRound, Plus, Trash2, Copy, Ban, RotateCcw, RefreshCw, Download, Check, Users, Ticket, Search } from 'lucide-react';
 
 const KEY_STORE = 'pkpm_pusat_admin_key';
 
@@ -35,6 +37,12 @@ function tanggal(iso?: string | null): string {
   }
 }
 
+const LABEL_PERAN: Record<string, string> = {
+  admin_kabupaten: 'Admin Kabupaten',
+  penilai: 'Penilai',
+  pengawas: 'Pengawas',
+};
+
 export function KodeAktivasiPage() {
   // Seperti PKG & PKKM: sekali login admin, semua fitur langsung terbuka.
   // Kunci admin diwarisi dari sesi login (sessionStorage) atau dari perangkat
@@ -47,9 +55,14 @@ export function KodeAktivasiPage() {
   );
   const [kode, setKode] = useState<KodeLisensi[]>([]);
   const [stat, setStat] = useState<any>(null);
+  const [akun, setAkun] = useState<AkunTerdaftar[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
+  const [cariAkun, setCariAkun] = useState('');
+
+  // Tab halaman: penerbitan kode vs pemantauan akun.
+  const [hal, setHal] = useState<'kode' | 'akun'>('kode');
 
   // Form generate
   const [jumlah, setJumlah] = useState(1);
@@ -62,9 +75,15 @@ export function KodeAktivasiPage() {
   const muat = useCallback(async (key: string) => {
     setBusy(true);
     setErr('');
-    const [list, s] = await Promise.all([adminListCodes(key), adminGetStats(key)]);
+    const [list, s, ak] = await Promise.all([
+      adminListCodes(key), adminGetStats(key), adminListAccounts(key),
+    ]);
     setKode(list);
     setStat(s);
+    setAkun(ak.data);
+    if (!ak.success && ak.reason !== 'network_error') {
+      setErr(`Daftar akun belum bisa dibaca: ${pesanAlasan(ak.reason)}`);
+    }
     setBusy(false);
   }, []);
 
@@ -142,6 +161,36 @@ export function KodeAktivasiPage() {
   const aktif = kode.filter(k => k.is_active).length;
   const terpakai = kode.filter(k => k.used_by).length;
 
+  const akunAktif = akun.filter(a => a.aktif).length;
+  const akunNonaktif = akun.length - akunAktif;
+
+  const akunTampil = akun.filter(a => {
+    const q = cariAkun.trim().toLowerCase();
+    if (!q) return true;
+    return [a.nama, a.username, a.kode, a.uid, a.orgId, LABEL_PERAN[a.peran] || a.peran]
+      .filter(Boolean)
+      .some(v => String(v).toLowerCase().includes(q));
+  });
+
+  function eksporAkunCsv() {
+    const head = 'nama,username,peran,kode,status,org,uid,dibuat';
+    const rows = akunTampil.map(a => [
+      `"${(a.nama || '').replace(/"/g, "'")}"`,
+      a.username,
+      LABEL_PERAN[a.peran] || a.peran,
+      a.kode || '',
+      a.aktif ? 'aktif' : 'nonaktif',
+      a.orgId,
+      a.uid,
+      tanggal(a.dibuat_at),
+    ].join(','));
+    const blob = new Blob([[head, ...rows].join('\n')], { type: 'text/csv;charset=utf-8' });
+    const el = document.createElement('a');
+    el.href = URL.createObjectURL(blob);
+    el.download = `akun-epkpm-${new Date().toISOString().slice(0, 10)}.csv`;
+    el.click();
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -153,7 +202,11 @@ export function KodeAktivasiPage() {
           <button className="btn-ghost" onClick={() => muat(adminKey)} disabled={busy}>
             <RefreshCw size={16} className={busy ? 'animate-spin' : ''} /> Muat ulang
           </button>
-          <button className="btn-ghost" onClick={eksporCsV} disabled={!kode.length}>
+          <button
+            className="btn-ghost"
+            onClick={hal === 'kode' ? eksporCsV : eksporAkunCsv}
+            disabled={hal === 'kode' ? !kode.length : !akunTampil.length}
+          >
             <Download size={16} /> Ekspor CSV
           </button>
           <button className="btn-ghost text-red-600" onClick={() => simpanKey('')}>
@@ -162,13 +215,39 @@ export function KodeAktivasiPage() {
         </div>
       </div>
 
+      <div className="flex gap-2 bg-slate-100 p-1 rounded-lg w-fit">
+        <button
+          className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-bold ${hal === 'kode' ? 'bg-white text-[#173f70] shadow' : 'text-slate-500'}`}
+          onClick={() => { setHal('kode'); setMsg(''); setErr(''); }}
+        >
+          <Ticket size={16} /> Kelola Kode
+        </button>
+        <button
+          className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-bold ${hal === 'akun' ? 'bg-white text-[#173f70] shadow' : 'text-slate-500'}`}
+          onClick={() => { setHal('akun'); setMsg(''); setErr(''); }}
+        >
+          <Users size={16} /> Kelola Akun
+          {akun.length > 0 && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#173f70] text-white">{akun.length}</span>
+          )}
+        </button>
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          ['Total kode', kode.length],
-          ['Kode aktif', aktif],
-          ['Sudah dipakai', terpakai],
-          ['Masih tersedia', aktif - terpakai],
-        ].map(([label, nilai]) => (
+        {(hal === 'kode'
+          ? [
+              ['Total kode', kode.length],
+              ['Kode aktif', aktif],
+              ['Sudah dipakai', terpakai],
+              ['Masih tersedia', aktif - terpakai],
+            ]
+          : [
+              ['Total akun', akun.length],
+              ['Akun aktif', akunAktif],
+              ['Akun nonaktif', akunNonaktif],
+              ['Kode terpakai', terpakai],
+            ]
+        ).map(([label, nilai]) => (
           <div key={String(label)} className="card p-4">
             <p className="text-xs text-slate-500">{label}</p>
             <p className="text-2xl font-bold text-[#173f70]">{nilai}</p>
@@ -176,6 +255,69 @@ export function KodeAktivasiPage() {
         ))}
       </div>
 
+      {hal === 'akun' ? (
+        <div className="card p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h3 className="font-bold text-[#173f70]">Akun Pengguna</h3>
+            <div className="relative">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                className="input pl-9 w-64"
+                placeholder="Cari nama / username / kode"
+                value={cariAkun}
+                onChange={e => setCariAkun(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {!akun.length ? (
+            <p className="text-sm text-slate-500">
+              {busy ? 'Memuat daftar akun…' : 'Belum ada akun yang mengaktivasi kode di kabupaten ini.'}
+            </p>
+          ) : !akunTampil.length ? (
+            <p className="text-sm text-slate-500">Tidak ada akun yang cocok dengan pencarian.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-slate-500 border-b">
+                    <th className="py-2">Nama</th>
+                    <th className="py-2">Username</th>
+                    <th className="py-2">Peran</th>
+                    <th className="py-2">Kode dipakai</th>
+                    <th className="py-2">Status</th>
+                    <th className="py-2">Terdaftar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {akunTampil.map(a => (
+                    <tr key={a.uid} className="border-b last:border-0">
+                      <td className="py-2 font-medium text-slate-700">{a.nama || '—'}</td>
+                      <td className="py-2 text-slate-600">{a.username}</td>
+                      <td className="py-2">
+                        <span className="badge bg-blue-100 text-blue-800">
+                          {LABEL_PERAN[a.peran] || a.peran}
+                        </span>
+                      </td>
+                      <td className="py-2 font-mono text-xs text-slate-500">{a.kode || '—'}</td>
+                      <td className="py-2">
+                        <span className={`badge ${a.aktif ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                          {a.aktif ? 'Aktif' : 'Nonaktif'}
+                        </span>
+                      </td>
+                      <td className="py-2 text-slate-500">{tanggal(a.dibuat_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {msg && <p className="text-emerald-700 text-sm mt-4 bg-emerald-50 border border-emerald-200 rounded-lg p-3">{msg}</p>}
+          {err && <p className="text-red-600 text-sm mt-4 bg-red-50 border border-red-200 rounded-lg p-3">{err}</p>}
+        </div>
+      ) : (
+      <>
       <div className="card p-5">
         <h3 className="font-bold text-[#173f70] mb-4">Terbitkan Kode Baru</h3>
         <div className="flex gap-2 mb-4 bg-slate-100 p-1 rounded-lg w-fit">
@@ -314,6 +456,8 @@ export function KodeAktivasiPage() {
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

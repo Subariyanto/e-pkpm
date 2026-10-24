@@ -15,9 +15,9 @@
  */
 import {
   aktivasiDenganKode, loginAkun, loginAdmin as loginAdminFirebase,
-  terbitkanKode, daftarKode, ubahStatusKode, daftarOrg,
+  terbitkanKode, daftarKode, daftarAkun, ubahStatusKode, daftarOrg,
   pesanAktivasi, auth, konfigAda,
-  type ProfilAkun, type Org,
+  type ProfilAkun, type Org, type AkunRingkas,
 } from './kodeAktivasi';
 
 /* ------------------------------------------------------------------ */
@@ -49,6 +49,18 @@ export interface KodeLisensi {
   used_at?: string | null;
   created_at?: string | null;
   expires_at?: string | null;
+}
+
+export interface AkunTerdaftar {
+  uid: string;
+  username: string;
+  nama: string;
+  email: string;
+  peran: string;
+  orgId: string;
+  aktif: boolean;
+  kode: string | null;
+  dibuat_at: string | null;
 }
 
 /** Petakan alasan dari lapisan Firebase ke kalimat siap tampil. */
@@ -230,6 +242,31 @@ export async function adminGetStats(_adminKey: string, orgId = '') {
   };
 }
 
+/**
+ * Daftar akun terdaftar (untuk pemantauan aktivasi di panel admin).
+ * Mengembalikan alasan kegagalan supaya UI bisa membedakan "belum ada akun"
+ * dengan "tidak berwenang membaca koleksi akun".
+ */
+export async function adminListAccounts(
+  _adminKey: string,
+): Promise<{ success: boolean; reason: string; data: AkunTerdaftar[] }> {
+  const r = await daftarAkun();
+  if (!r.sukses) return { success: false, reason: r.alasan, data: [] };
+  const data = r.data.map((a: AkunRingkas) => ({
+    uid: a.uid,
+    username: a.username,
+    nama: a.nama,
+    email: a.email || '',
+    peran: a.peran || 'penilai',
+    orgId: a.orgId || '',
+    aktif: a.aktif !== false,
+    kode: a.kode || null,
+    dibuat_at: (a.dibuatAt as any)?.toDate?.()?.toISOString?.()
+      || (typeof a.dibuatAt === 'string' ? a.dibuatAt : null),
+  }));
+  return { success: true, reason: 'ok', data };
+}
+
 /** Verifikasi kunci admin — di Firebase cukup memastikan sesi login valid. */
 export async function verifyAdminKey(_adminKey: string): Promise<boolean> {
   try {
@@ -264,4 +301,4 @@ export async function daftarOrganisasi(): Promise<Org[]> {
   return daftarOrg();
 }
 
-export type { ProfilAkun, Org };
+export type { ProfilAkun, Org, AkunRingkas };

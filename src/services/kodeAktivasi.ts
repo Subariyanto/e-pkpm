@@ -61,6 +61,20 @@ export interface ProfilAkun {
   kode?: string;
 }
 
+export interface AkunRingkas {
+  uid: string;
+  username: string;
+  email?: string;
+  nama: string;
+  peran: Peran | string;
+  orgId: string;
+  pengawasId?: string;
+  aktif: boolean;
+  kode?: string | null;
+  dibuatAt?: unknown;
+  terakhirMasuk?: unknown;
+}
+
 export interface Org {
   id: string;
   nama: string;
@@ -361,6 +375,37 @@ export async function ubahStatusKode(opts: {
     return { sukses: true, alasan: 'ok' };
   } catch {
     return { sukses: false, alasan: 'network_error' };
+  }
+}
+
+/**
+ * Daftar seluruh akun terdaftar (koleksi `akun`). Dipakai panel admin untuk
+ * memantau siapa yang sudah aktivasi dan siapa yang belum.
+ * Security Rules membatasi list ke admin kabupaten (`adminKab()`).
+ */
+export async function daftarAkun(): Promise<{ sukses: boolean; data: AkunRingkas[]; alasan: string }> {
+  try {
+    const { fs } = siapkan();
+    const snap = await getDocs(collection(fs, 'akun', 'items', 'data'));
+    const data: AkunRingkas[] = snap.docs.map(d => {
+      const v = d.data() as any;
+      return {
+        uid: d.id,
+        username: String(v.username || ''),
+        email: String(v.email || ''),
+        nama: String(v.nama || v.username || ''),
+        peran: (v.peran as Peran) || 'penilai',
+        orgId: String(v.orgId || ''),
+        pengawasId: v.pengawasId ? String(v.pengawasId) : undefined,
+        aktif: v.aktif !== false,
+        kode: v.kode ? String(v.kode) : null,
+        dibuatAt: v.dibuatAt ?? null,
+        terakhirMasuk: v.terakhirMasuk ?? null,
+      };
+    });
+    return { sukses: true, data, alasan: 'ok' };
+  } catch {
+    return { sukses: false, data: [], alasan: 'network_error' };
   }
 }
 
