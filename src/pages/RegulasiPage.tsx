@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, audit } from '../lib/db';
 import { Button, Card, PageTitle } from '../components/Layout';
-import { regulasiData } from '../data/demo';
+import { regulasiData, REGULASI_NOTE } from '../data/demo';
 import type { Regulasi } from '../types';
 type RegForm = { id: string; nomor?: string; tentang?: string; tahun?: number; status?: string; catatan?: string; link?: string } & Partial<Regulasi>;
 import { useState } from 'react';
@@ -61,6 +61,7 @@ export function RegulasiPage() {
             </Button>
           </div>
         } />
+      <Card className="mb-4"><p className="text-sm text-slate-700">{REGULASI_NOTE}</p></Card>
       {form && (
         <Card className="mb-4">
           <div className="grid md:grid-cols-2 gap-3">

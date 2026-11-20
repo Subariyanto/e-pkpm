@@ -58,6 +58,18 @@ export async function ensureInstrumenBaku(): Promise<number> {
   return baru.length;
 }
 
+/** Tambahkan regulasi default yang belum ada tanpa menimpa atau menghapus data lokal. */
+export async function ensureRegulasiBaku(): Promise<number> {
+  const existing = await db.regulasi.toArray();
+  const ids = new Set(existing.map(x => x.id));
+  const numbers = new Set(existing.map(x => (x.nomor || x.number || '').toLowerCase().replace(/\s+/g, ' ').trim()).filter(Boolean));
+  const missing = regulasiData.filter(r => !ids.has(r.id) && !numbers.has((r.nomor || r.number || '').toLowerCase().replace(/\s+/g, ' ').trim()));
+  if (!missing.length) return 0;
+  await db.regulasi.bulkAdd(missing);
+  await audit('SINKRON_REGULASI', 'Regulasi baku', `${missing.length} regulasi ditambahkan`);
+  return missing.length;
+}
+
 export async function seedDemo() {
   const pin = await sha256('123456');
   await db.transaction('rw', db.tables, async () => {

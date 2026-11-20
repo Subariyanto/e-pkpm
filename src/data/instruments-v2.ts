@@ -73,6 +73,13 @@ const DEFS: Def[] = [
   pkbActivity: 'Workshop penyusunan RPA/RPM dan telaah sejawat',
   examples: E('RPA/RPM lengkap dengan skenario, instrumen, dan rencana RTL.', 'RPA/RPM ada tetapi sebagian komponen (indikator/skenario) belum lengkap.', 'Tidak ditemukan RPA/RPM.'),
   rtl: { problem: 'RPA/RPM belum disusun untuk kegiatan prioritas', action: 'Menyusun RPA/RPM lengkap dengan instrumen', product: 'Dokumen RPA dan/atau RPM' } },
+ { code: 'K1.KBC', component: 'K1', title: 'Integrasi Rencana Pendampingan KBC',
+  uraian: 'Merencanakan pendampingan implementasi Kurikulum Berbasis Cinta (KBC) sebagai bagian dari program pengawasan, terintegrasi dengan rencana pendampingan melalui aplikasi MAGIS.',
+  aspects: ['KBC terintegrasi dalam program pengawasan tahunan/semester dan RPA/RPM', 'Kebutuhan dan sasaran pendampingan KBC terpetakan', 'Tujuan, jadwal, strategi, indikator keberhasilan, dan tindak lanjut dirumuskan', 'Rencana pendampingan selaras/tercatat pada aplikasi MAGIS'],
+  docs: ['Program pengawasan tahunan/semester yang memuat pendampingan KBC', 'RPA/RPM atau rencana kegiatan pendampingan KBC', 'Analisis kebutuhan dan peta sasaran madrasah', 'Bukti rencana/rekap dari aplikasi MAGIS (nomor, tangkapan layar, atau ekspor yang dapat diverifikasi)'],
+  pkb: 'Penguatan perencanaan pendampingan implementasi KBC berbasis kebutuhan madrasah.', pkbActivity: 'Lokakarya penyelarasan program pengawasan, rencana KBC, dan MAGIS',
+  examples: E('Rencana KBC terintegrasi dan terukur, sesuai kebutuhan madrasah, serta keterkaitannya dengan MAGIS dapat diverifikasi.', 'Rencana KBC tersedia tetapi sasaran, indikator, jadwal, atau bukti keterkaitan MAGIS belum lengkap.', 'Tidak ditemukan rencana pendampingan KBC dalam program pengawasan.'),
+  rtl: { problem: 'Rencana pendampingan KBC belum terintegrasi/terukur', action: 'Menyelaraskan program pengawasan dengan rencana KBC dan MAGIS', product: 'Program/rencana pendampingan KBC yang terintegrasi dan dapat diverifikasi' } },
  /* ================= K2 — PELAKSANAAN PROGRAM PENGAWASAN ================= */
  { code: 'K2.1', component: 'K2', title: 'Pelaksanaan Pembinaan Guru dan/atau Kepala Madrasah',
   uraian: 'Melaksanakan pembinaan guru dan/atau kepala madrasah sesuai program, sasaran, dan kebutuhan.',
@@ -106,6 +113,13 @@ const DEFS: Def[] = [
   pkbActivity: 'Workshop penulisan laporan tahunan dan telaah sejawat',
   examples: E('Laporan tahunan lengkap, analitis, didukung data dan disampaikan tepat waktu.', 'Laporan ada tetapi analisis atau lampiran belum lengkap.', 'Tidak ditemukan laporan tahunan.'),
   rtl: { problem: 'Laporan tahunan belum sistematis/analitis', action: 'Menyusun laporan tahunan berbasis data pelaksanaan', product: 'Laporan tahunan pelaksanaan program pengawasan' } },
+ { code: 'K2.KBC', component: 'K2', title: 'Sosialisasi dan Pendampingan Implementasi KBC',
+  uraian: 'Melaksanakan sosialisasi dan pendampingan implementasi Kurikulum Berbasis Cinta kepada madrasah binaan sesuai program pengawasan.',
+  aspects: ['Sosialisasi/pemahaman KBC kepada guru dan/atau kepala madrasah', 'Pendampingan penerapan KBC dalam kegiatan madrasah', 'Sasaran, metode, jadwal, dan hasil kegiatan terdokumentasi', 'Ada produk, umpan balik, atau tindak lanjut pendampingan'],
+  docs: ['Surat tugas/undangan dan daftar hadir sosialisasi KBC', 'Materi/panduan KBC', 'Laporan pendampingan di madrasah', 'Dokumentasi kegiatan dan produk guru/madrasah', 'Umpan balik dan bukti tindak lanjut'],
+  pkb: 'Penguatan kemampuan mendampingi implementasi KBC secara kontekstual.', pkbActivity: 'Sosialisasi, lokakarya, dan pendampingan KBC di madrasah binaan',
+  examples: E('Sosialisasi dan pendampingan terlaksana sesuai sasaran, hasil/produk dan tindak lanjut dapat diverifikasi.', 'Kegiatan terlaksana tetapi dokumentasi, produk, atau tindak lanjut belum lengkap.', 'Tidak ditemukan bukti sosialisasi atau pendampingan KBC.'),
+  rtl: { problem: 'Sosialisasi/pendampingan KBC belum menjangkau sasaran atau belum berdampak', action: 'Melaksanakan pendampingan KBC dengan produk dan tindak lanjut terukur', product: 'Laporan, produk pendampingan, dan bukti tindak lanjut KBC' } },
  /* ================= K3 — EVALUASI HASIL PELAKSANAAN PROGRAM ================= */
  { code: 'K3.1', component: 'K3', title: 'Evaluasi Hasil Pembinaan',
   uraian: 'Melaksanakan evaluasi hasil pembinaan guru dan/atau kepala madrasah.',
@@ -148,6 +162,13 @@ const DEFS: Def[] = [
   examples: E('Evaluasi wilayah lengkap dengan rekomendasi kebijakan yang disampaikan.', 'Evaluasi ada tetapi analisis antarwilayah belum memadai.', 'Tidak ditemukan evaluasi tingkat wilayah.'),
   levels: ['Madya', 'Utama'],
   rtl: { problem: 'Evaluasi tingkat wilayah belum dilaksanakan', action: 'Menyusun evaluasi wilayah sesuai penugasan', product: 'Laporan evaluasi wilayah dan rekomendasi' } },
+ { code: 'K3.KBC', component: 'K3', title: 'Evaluasi Hasil Pendampingan Nilai KBC',
+  uraian: 'Mengevaluasi hasil pendampingan nilai-nilai Kurikulum Berbasis Cinta pada pembelajaran, ekstrakurikuler, kokurikuler, dan pengembangan budaya madrasah yang mencerminkan Panca Cinta.',
+  aspects: ['Nilai Panca Cinta terintegrasi dalam pembelajaran', 'Nilai Panca Cinta tampak pada kegiatan ekstrakurikuler dan kokurikuler', 'Budaya madrasah mencerminkan nilai-nilai Panca Cinta', 'Hasil, kesenjangan, dampak, dan rekomendasi tindak lanjut dianalisis berdasarkan bukti'],
+  docs: ['Instrumen/lembar observasi atau evaluasi implementasi KBC', 'Sampel perangkat ajar dan hasil karya/kegiatan siswa', 'Bukti kegiatan ekstrakurikuler dan kokurikuler', 'Dokumentasi budaya/program madrasah terkait Panca Cinta', 'Analisis hasil, umpan balik warga madrasah, dan rekomendasi/RTL'],
+  pkb: 'Penguatan evaluasi dampak pendampingan KBC dan pemanfaatan hasil untuk perbaikan.', pkbActivity: 'Lokakarya evaluasi implementasi Panca Cinta dan penyusunan RTL',
+  examples: E('Evaluasi berbasis bukti mencakup pembelajaran, ekstrakurikuler, kokurikuler, budaya madrasah, analisis dampak, dan RTL.', 'Evaluasi dilakukan tetapi salah satu ranah atau analisis dampak/RTL belum memadai.', 'Tidak ada evaluasi hasil pendampingan nilai KBC.'),
+  rtl: { problem: 'Hasil pendampingan nilai KBC belum dievaluasi menyeluruh', action: 'Melakukan evaluasi berbasis bukti pada empat ranah dan menyusun RTL', product: 'Laporan evaluasi implementasi KBC dan rekomendasi perbaikan' } },
  /* ================= K4 — PEMBIMBINGAN DAN PELATIHAN PROFESIONAL ================= */
  { code: 'K4.1', component: 'K4', title: 'Program Pembimbingan dan Pelatihan Profesional',
   uraian: 'Memiliki program pembimbingan dan pelatihan profesional berdasarkan pemetaan kebutuhan PKB.',
@@ -216,6 +237,13 @@ const DEFS: Def[] = [
   pkbActivity: 'Bimbingan penyusunan karya inovatif dan publikasi ilmiah',
   examples: E('Seluruh bukti dukung unsur tambahan tersedia dan relevan.', 'Bukti dukung tersedia sebagian atau belum lengkap.', 'Tidak ditemukan bukti dukung unsur tambahan.'),
   rtl: { problem: 'Bukti dukung unsur tambahan belum lengkap', action: 'Melengkapi sertifikat, karya inovatif, dan publikasi ilmiah', product: 'Bundel bukti dukung unsur tambahan' } },
+ { code: 'K4.KBC', component: 'K4', title: 'Praktik Baik/Inovasi Pembimbingan KBC',
+  uraian: 'Menghasilkan praktik baik atau inovasi dari pembimbingan dan pelatihan KBC yang menunjukkan kontribusi nyata pengawas terhadap peningkatan kualitas pembelajaran dan budaya madrasah.',
+  aspects: ['Masalah/kebutuhan yang melatarbelakangi praktik baik teridentifikasi', 'Inovasi atau praktik baik merupakan hasil pembimbingan/pelatihan KBC', 'Kontribusi terhadap pembelajaran atau budaya madrasah ditunjukkan dengan bukti', 'Hasil, dampak, keberlanjutan, atau potensi replikasi didokumentasikan'],
+  docs: ['Naskah praktik baik/inovasi dan konteks masalah', 'Dokumentasi proses pembimbingan/pelatihan KBC', 'Produk guru/madrasah atau perangkat pembelajaran hasil pendampingan', 'Bukti perubahan/hasil atau umpan balik penerima manfaat', 'Rencana keberlanjutan atau diseminasi praktik baik'],
+  pkb: 'Penguatan dokumentasi dan diseminasi praktik baik pendampingan KBC.', pkbActivity: 'Klinik penulisan praktik baik dan berbagi inovasi KBC',
+  examples: E('Praktik baik/inovasi terdokumentasi, berasal dari pendampingan KBC, dan kontribusi/dampaknya pada pembelajaran atau budaya madrasah dapat dibuktikan.', 'Praktik baik ada tetapi bukti kontribusi, hasil, atau keberlanjutannya belum kuat.', 'Tidak ditemukan praktik baik/inovasi hasil pembimbingan KBC.'),
+  rtl: { problem: 'Praktik baik hasil pendampingan KBC belum terdokumentasi/terukur', action: 'Mendokumentasikan proses, bukti hasil, dan potensi replikasi inovasi KBC', product: 'Naskah praktik baik/inovasi KBC beserta bukti dampak' } },
 ];
 
 /**
@@ -230,15 +258,18 @@ export const RHK_MAP: Record<string, { no: number; tw: string; nama: string }[]>
  'K1.4': [{ no: 26, tw: 'IV', nama: 'Instrumen Monitoring dan Analisis Kebutuhan Guru Agama pada Madrasah Binaan' }],
  'K1.5': [{ no: 2, tw: 'I', nama: 'Dokumen Evaluasi Perangkat Kurikulum Madrasah' }],
  'K1.6': [{ no: 4, tw: 'I', nama: 'Dokumen Analisis Data Hasil Asesmen Literasi dan Numerasi' }],
+ 'K1.KBC': [{ no: 1, tw: 'I', nama: 'Dokumen Program Pendampingan Tahunan yang terintegrasi dengan rencana KBC pada MAGIS' }],
  'K2.1': [{ no: 13, tw: 'III', nama: 'Laporan Pendampingan Klinis Penerapan Pembelajaran Mendalam melalui Supervisi Akademik' }],
  'K2.2': [{ no: 9, tw: 'II', nama: 'Laporan Pendampingan Penyusunan/Reviu Kurikulum Madrasah yang Mengintegrasikan Pembelajaran Mendalam dan Kurikulum Berbasis Cinta' }],
  'K2.3': [{ no: 11, tw: 'II', nama: 'Laporan Pembinaan, Pendampingan, Monitoring, dan Evaluasi Pengembangan Perangkat Kurikulum Madrasah' }],
  'K2.4': [{ no: 19, tw: 'IV', nama: 'Dokumen Pengumpulan Data, Analisis Hasil Pendampingan, dan Evaluasi Dampak Pendampingan' }],
+ 'K2.KBC': [{ no: 9, tw: 'II', nama: 'Laporan Pendampingan Implementasi Kurikulum Berbasis Cinta' }],
  'K3.1': [{ no: 14, tw: 'III', nama: 'Laporan Evaluasi Implementasi Kebijakan Kurikulum pada Madrasah Binaan' }],
  'K3.2': [{ no: 15, tw: 'III', nama: 'Laporan Pembinaan dan Pendampingan Pemenuhan Standar Satuan Pendidikan Unggul' }],
  'K3.3': [{ no: 22, tw: 'IV', nama: 'Laporan Pembinaan, Pendampingan, Monitoring, dan Evaluasi Pemenuhan Kualifikasi dan Kompetensi Tenaga Kependidikan' }],
  'K3.4': [{ no: 19, tw: 'IV', nama: 'Dokumen Pengumpulan Data, Analisis Hasil Pendampingan, dan Evaluasi Dampak Pendampingan' }],
  'K3.5': [{ no: 7, tw: 'II', nama: 'Laporan Pendampingan Kolaboratif Bersama Kepala Madrasah dan Komite' }],
+ 'K3.KBC': [{ no: 19, tw: 'IV', nama: 'Dokumen Analisis Hasil Pendampingan dan Evaluasi Dampak Implementasi KBC' }],
  'K4.1': [{ no: 21, tw: 'IV', nama: 'Laporan Pembinaan Perencanaan Kebutuhan Guru' }],
  'K4.2': [{ no: 25, tw: 'IV', nama: 'Laporan Pembinaan dan Pendampingan Pengembangan Kegiatan Ekstrakurikuler' }],
  'K4.3': [{ no: 12, tw: 'II', nama: 'Laporan Pendampingan Pemenuhan Standar Akreditasi melalui Pembinaan Tata Kelola Madrasah' }],
@@ -252,6 +283,7 @@ export const RHK_MAP: Record<string, { no: number; tw: string; nama: string }[]>
   { no: 29, tw: 'Tambahan', nama: 'Buku, Makalah, Jurnal, PTKP, atau Karya Publikasi Ilmiah' },
   { no: 30, tw: 'Tambahan', nama: 'SK Pengurus Pokjawas/APSI atau Dokumen Keaktifan Organisasi Profesi' },
  ],
+ 'K4.KBC': [{ no: 20, tw: 'IV', nama: 'Dokumen Praktik Baik/Inovasi Pendampingan Kurikulum Berbasis Cinta' }],
 };
 
 export const COMPONENT_TITLES: Record<ComponentKey, string> = {
@@ -294,4 +326,5 @@ export const regulationsSeed: Regulation[] = [
  { id: 'r8', number: 'Kepdirjen Pendidikan Islam Nomor 6934 Tahun 2014', title: 'Pedoman Penilaian Kinerja Pengawas Madrasah', year: 2014, status: 'pedoman', order: 8, note: 'Instrumen teknis K1–K4 merujuk pedoman ini dan diselaraskan dengan nomenklatur terbaru.' },
  { id: 'r9', number: 'Permendiknas Nomor 12 Tahun 2007', title: 'Standar Pengawas Sekolah/Madrasah', year: 2007, status: 'referensi', order: 9, note: 'Referensi kompetensi pengawas.' },
  { id: 'r10', number: 'PermenPANRB Nomor 21 Tahun 2024', title: 'Jabatan Fungsional (regulasi lama jabatan pengawas)', year: 2024, status: 'dicabut', order: 10, note: 'Tidak ditampilkan sebagai dasar yang masih berlaku; digantikan PermenPANRB Nomor 7 Tahun 2026.' },
+ { id: 'r11', number: 'Keputusan Direktur Jenderal Pendidikan Islam Nomor 6077 Tahun 2025', title: 'Panduan Kurikulum Berbasis Cinta', year: 2025, status: 'pedoman', order: 11, note: 'Pedoman implementasi Kurikulum Berbasis Cinta dan dasar indikator pendampingan KBC dalam Penilaian Kinerja Pengawas Madrasah Tahun 2026.' },
 ];

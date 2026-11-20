@@ -12,9 +12,10 @@ export const regulasiData: Regulasi[] = [
   { id: 'r8', nomor: 'Kepdirjen Pendis No. 6934 Tahun 2014', judul: 'Pedoman Penilaian Kinerja Pengawas Madrasah', tahun: 2014, status: 'pedoman_teknis', kategori: 'Pedoman Teknis PKPM', catatan: 'Instrumen teknis K1–K4 masih merujuk pada pedoman ini, diselaraskan dengan nomenklatur terbaru.', urutan: 8 },
   { id: 'r9', nomor: 'Permendiknas No. 12 Tahun 2007', judul: 'Standar Pengawas Sekolah/Madrasah', tahun: 2007, status: 'referensi', kategori: 'Referensi Kompetensi', urutan: 9 },
   { id: 'r10', nomor: 'PermenPANRB No. 21 Tahun 2024', judul: 'Jabatan Fungsional Pengawas (lama)', tahun: 2024, status: 'dicabut', kategori: 'Dicabut', catatan: 'Tidak ditampilkan sebagai dasar yang masih berlaku.', urutan: 10 },
+  { id: 'r11', nomor: 'Kepdirjen Pendis No. 6077 Tahun 2025', judul: 'Panduan Kurikulum Berbasis Cinta', tahun: 2025, status: 'pedoman_teknis', kategori: 'Pedoman Teknis KBC', catatan: 'Pedoman implementasi KBC dan dasar indikator pendampingan KBC dalam Penilaian Kinerja Pengawas Madrasah Tahun 2026.', urutan: 11 },
 ];
 
-export const REGULASI_NOTE = 'PermenPANRB Nomor 7 Tahun 2026 menjadi dasar terbaru jabatan fungsional di bidang pendidik dan pengawasan mutu pendidikan. Instrumen teknis K1–K4 masih merujuk pada Pedoman PKPM Kementerian Agama tahun 2014 dan diselaraskan dengan nomenklatur, pengelolaan kinerja ASN, dan kebutuhan pengembangan kompetensi terbaru.';
+export const REGULASI_NOTE = 'PermenPANRB Nomor 7 Tahun 2026 menjadi dasar terbaru jabatan fungsional di bidang pendidik dan pengawasan mutu pendidikan. Instrumen teknis K1–K4 merujuk Pedoman PKPM Kementerian Agama tahun 2014 serta Kepdirjen Pendis Nomor 6077 Tahun 2025 tentang Panduan Kurikulum Berbasis Cinta; perencanaan pendampingan KBC diselaraskan dengan MAGIS.';
 
 // === KRITERIA SKOR UMUM (Section C) ===
 const kriteriaUmum = {
@@ -88,6 +89,11 @@ const K1: Indicator[] = [
     ['Materi/aspek pengawasan','Tujuan','Indikator keberhasilan','Sasaran','Waktu','Tempat','Strategi/metode','Skenario kegiatan','Instrumen/sumber daya','Rencana tindak lanjut'],
     ['RPA','RPM','Instrumen','Materi','Daftar sasaran','Jadwal'],
     1, 5, 'Workshop penyusunan RPA/RPM', 'Susun RPA/RPM untuk kegiatan prioritas dengan skenario yang jelas.'),
+  ind('K1','K1.KBC','Integrasi Rencana Pendampingan KBC',
+    'Merencanakan pendampingan implementasi KBC sebagai bagian program pengawasan, terintegrasi dengan rencana pendampingan melalui aplikasi MAGIS.',
+    ['Muda','Madya','Utama'], ['KBC terintegrasi dalam program tahunan/semester dan RPA/RPM','Kebutuhan dan sasaran pendampingan terpetakan','Tujuan, jadwal, strategi, indikator, dan RTL dirumuskan','Rencana selaras/tercatat di MAGIS'],
+    ['Program pengawasan memuat KBC','RPA/RPM pendampingan KBC','Analisis kebutuhan dan peta sasaran','Bukti rencana/rekap MAGIS yang dapat diverifikasi'],
+    1, 6, 'Lokakarya penyelarasan program KBC dan MAGIS', 'Selaraskan program pengawasan dengan rencana pendampingan KBC dan MAGIS.'),
 ];
 
 // === K2 — PELAKSANAAN PROGRAM PENGAWASAN (Section H) ===
@@ -119,6 +125,11 @@ const K2: Indicator[] = [
     ['Identitas laporan','Pendahuluan','Kerangka pikir/permasalahan','Pendekatan dan metode','Hasil seluruh program','Kesimpulan dan rekomendasi','Lampiran'],
     ['Laporan tahunan','Rekap kegiatan','Rekap target dan realisasi','Tabel/grafik','Laporan pembinaan','Laporan pemantauan','Laporan penilaian','Bukti penyampaian laporan'],
     1, 13, 'Workshop penulisan laporan tahunan analitis', 'Susun laporan tahunan dengan analisis target-realisasi dan rekomendasi.'),
+  ind('K2','K2.KBC','Sosialisasi dan Pendampingan Implementasi KBC',
+    'Melaksanakan sosialisasi dan pendampingan implementasi Kurikulum Berbasis Cinta kepada madrasah binaan sesuai program pengawasan.',
+    ['Muda','Madya','Utama'], ['Sosialisasi KBC kepada guru/kepala madrasah','Pendampingan penerapan KBC','Sasaran, metode, jadwal, dan hasil terdokumentasi','Ada produk, umpan balik, atau tindak lanjut'],
+    ['Surat tugas/undangan dan daftar hadir','Materi KBC','Laporan pendampingan','Dokumentasi dan produk madrasah','Umpan balik dan bukti tindak lanjut'],
+    1, 14, 'Sosialisasi dan pendampingan KBC di madrasah binaan', 'Laksanakan pendampingan KBC dengan produk dan tindak lanjut terukur.'),
 ];
 
 // === K3 — EVALUASI HASIL PELAKSANAAN PROGRAM PENGAWASAN (Section I) ===
@@ -158,6 +169,11 @@ const K3: Indicator[] = [
     ['Surat tugas','Data agregat','Laporan evaluasi wilayah','Analisis antarwilayah/jenjang','Grafik/peta masalah','Rekomendasi kebijakan','Bukti penyampaian'],
     1, 24, 'Forum koordinasi evaluasi tingkat kabupaten/provinsi', 'Laksanakan evaluasi tingkat wilayah sesuai penugasan resmi.',
     { 0: kriteriaUmum[0], 1: kriteriaUmum[1], 2: kriteriaUmum[2] }),
+  ind('K3','K3.KBC','Evaluasi Hasil Pendampingan Nilai KBC',
+    'Mengevaluasi hasil pendampingan nilai Panca Cinta pada pembelajaran, ekstrakurikuler, kokurikuler, dan budaya madrasah.',
+    ['Muda','Madya','Utama'], ['Panca Cinta dalam pembelajaran','Panca Cinta dalam ekstrakurikuler/kokurikuler','Budaya madrasah mencerminkan Panca Cinta','Analisis hasil, dampak, dan RTL berbasis bukti'],
+    ['Instrumen/lembar observasi KBC','Perangkat ajar dan hasil karya siswa','Bukti ekstrakurikuler/kokurikuler','Dokumentasi budaya madrasah','Analisis, umpan balik, rekomendasi/RTL'],
+    1, 25, 'Lokakarya evaluasi implementasi Panca Cinta', 'Evaluasi empat ranah implementasi KBC dan susun RTL berbasis bukti.'),
 ];
 
 // === K4 — PEMBIMBINGAN DAN PELATIHAN PROFESIONAL (Section J) ===
@@ -210,6 +226,11 @@ const K4: Indicator[] = [
     ['Identitas laporan','Pendahuluan','Kerangka pikir','Metode','Hasil','Kesimpulan dan rekomendasi','Lampiran'],
     ['Laporan tahunan','Rekap kegiatan','Daftar peserta','Rekap evaluasi','Produk peserta','Analisis dampak','Dokumentasi','Rekomendasi PKB berikutnya'],
     1, 36, 'Pendampingan penyusunan laporan tahunan pembimbingan', 'Susun laporan tahunan pembimbingan dengan analisis dampak.'),
+  ind('K4','K4.KBC','Praktik Baik/Inovasi Pembimbingan KBC',
+    'Menghasilkan praktik baik atau inovasi hasil pembimbingan KBC yang menunjukkan kontribusi nyata terhadap kualitas pembelajaran dan budaya madrasah.',
+    ['Muda','Madya','Utama'], ['Masalah/kebutuhan teridentifikasi','Praktik baik berasal dari pembimbingan KBC','Kontribusi pada pembelajaran/budaya dibuktikan','Hasil, dampak, keberlanjutan/replikasi didokumentasikan'],
+    ['Naskah praktik baik dan konteks masalah','Dokumentasi pembimbingan KBC','Produk guru/madrasah','Bukti perubahan/umpan balik','Rencana keberlanjutan/diseminasi'],
+    1, 37, 'Klinik penulisan praktik baik KBC', 'Dokumentasikan proses, bukti hasil, dampak, dan potensi replikasi inovasi KBC.'),
 ];
 
 export const indicators: Indicator[] = [...K1, ...K2, ...K3, ...K4];
